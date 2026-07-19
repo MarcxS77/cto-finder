@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Mapa CTO Vivo</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f172a; color: #f1f5f9; height: 100dvh; overflow: hidden; }
+
+    /* ── Tela de login ── */
+    #login-screen {
+      position: fixed; inset: 0; z-index: 2000;
+      background: linear-gradient(160deg, #0f172a 0%, #1e3a5f 60%, #172554 100%);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .login-card {
+      width: 100%; max-width: 380px;
+      background: rgba(30,41,59,.9); border: 1px solid #1e3a5f;
+      border-radius: 20px; padding: 36px 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    }
+    .login-logo { text-align: center; margin-bottom: 28px; }
+    .login-logo .icon { font-size: 40px; display: block; margin-bottom: 8px; }
+    .login-logo h1 { font-size: 20px; font-weight: 700; color: #f1f5f9; }
+    .login-logo h1 span { color: #60a5fa; }
+    .login-logo p { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+    .btn-google {
+      width: 100%; padding: 13px; border-radius: 10px; border: 1.5px solid #334155;
+      background: #1e293b; color: #f1f5f9; font-size: 14px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: background .2s, border-color .2s; margin-bottom: 20px;
+    }
+    .btn-google:hover { background: #273549; border-color: #475569; }
+    .btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    .divider { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .divider span { font-size: 12px; color: #475569; white-space: nowrap; }
+    .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #1e3a5f; }
+
+    .login-tabs { display: flex; gap: 0; margin-bottom: 20px; background: #0f172a; border-radius: 10px; padding: 3px; }
+    .login-tab {
+      flex: 1; padding: 8px; border: none; border-radius: 8px; cursor: pointer;
+      font-size: 13px; font-weight: 600; background: transparent; color: #64748b; transition: all .2s;
+    }
+    .login-tab.active { background: #1e3a5f; color: #93c5fd; }
+
+    .auth-form { display: flex; flex-direction: column; gap: 12px; }
+    .auth-form input {
+      padding: 12px 14px; border-radius: 10px; border: 1.5px solid #334155;
+      background: #0f172a; color: #f1f5f9; font-size: 14px; outline: none; transition: border .2s;
+    }
+    .auth-form input:focus { border-color: #3b82f6; }
+    .auth-form input::placeholder { color: #475569; }
+    .btn-auth {
+      padding: 13px; border-radius: 10px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff;
+      font-size: 14px; font-weight: 700; transition: opacity .2s; margin-top: 4px;
+    }
+    .btn-auth:disabled { opacity: .5; cursor: not-allowed; }
+    .auth-msg { font-size: 12px; text-align: center; min-height: 16px; }
+    .auth-msg.error { color: #f87171; }
+    .auth-msg.success { color: #4ade80; }
+
+    /* ── App (mapa) ── */
+    #app { display: none; }
+    #map { width: 100%; height: 100dvh; z-index: 1; }
+
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 900;
+      display: flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #172554 100%);
+      padding: 10px 14px; box-shadow: 0 2px 12px rgba(0,0,0,.4);
+    }
+    #topbar .logo { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #fff; flex: 1; }
+    #topbar .logo span { color: #60a5fa; }
+    .badge { font-size: 11px; background: #1d4ed8; color: #bfdbfe; padding: 2px 8px; border-radius: 20px; }
+    .user-info { display: flex; align-items: center; gap: 8px; }
+    .user-avatar {
+      width: 28px; height: 28px; border-radius: 50%; background: #1d4ed8;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #fff; overflow: hidden; flex-shrink: 0;
+    }
+    .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    #btn-logout {
+      background: none; border: 1px solid #334155; border-radius: 8px;
+      color: #94a3b8; font-size: 11px; padding: 4px 8px; cursor: pointer; transition: all .2s;
+    }
+    #btn-logout:hover { border-color: #ef4444; color: #f87171; }
+
+    .fab-group { position: fixed; bottom: 90px; right: 14px; z-index: 800; display: flex; flex-direction: column; gap: 10px; }
+    .fab { width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 4px 14px rgba(0,0,0,.45); transition: transform .15s, opacity .15s; }
+    .fab:active { transform: scale(.92); }
+    #btn-gps { background: #1d4ed8; color: #fff; }
+    #btn-lista { background: #0f172a; color: #60a5fa; border: 2px solid #1e3a5f; }
+    .fab.loading { opacity: .6; pointer-events: none; }
+
+    #hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,.85); backdrop-filter: blur(6px); color: #94a3b8; font-size: 12px; padding: 6px 14px; border-radius: 20px; z-index: 800; pointer-events: none; white-space: nowrap; }
+
+    #modal { display: none; position: fixed; inset: 0; z-index: 1000; align-items: flex-end; justify-content: center; }
+    #modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); }
+    .modal-card { position: relative; background: #1e293b; border-radius: 20px 20px 0 0; padding: 24px 20px 32px; width: 100%; max-width: 480px; box-shadow: 0 -8px 40px rgba(0,0,0,.5); animation: slideUp .25s ease; }
+    @keyframes slideUp { from { transform: translateY(60px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+    .modal-card h2 { font-size: 16px; color: #f1f5f9; margin-bottom: 18px; display:flex; align-items:center; gap:8px; }
+    .modal-card h2::before { content:"📍"; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 5px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; }
+    .form-group input, .form-group select { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #334155; background: #0f172a; color: #f1f5f9; font-size: 15px; outline: none; transition: border .2s; }
+    .form-group input:focus, .form-group select:focus { border-color: #3b82f6; }
+    .form-group select option { background: #1e293b; }
+    .form-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .btn-primary { flex: 1; padding: 13px; border: none; border-radius: 10px; cursor: pointer; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-size: 15px; font-weight: 600; transition: opacity .2s; }
+    .btn-primary:disabled { opacity: .5; }
+    .btn-secondary { padding: 13px 18px; border: 1.5px solid #334155; border-radius: 10px; background: transparent; color: #94a3b8; font-size: 15px; cursor: pointer; }
+
+    #painel { position: fixed; top: 0; left: 0; bottom: 0; width: 300px; max-width: 90vw; background: #1e293b; z-index: 950; transform: translateX(-100%); transition: transform .3s ease; display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(0,0,0,.5); }
+    #painel.open { transform: translateX(0); }
+    .painel-header { background: linear-gradient(135deg, #1e3a5f, #172554); padding: 50px 16px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .painel-header h3 { font-size: 15px; color: #f1f5f9; }
+    #cto-count { font-size: 12px; color: #93c5fd; }
+    #btn-fechar-painel { background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height:1; }
+    #lista-ctos { list-style: none; overflow-y: auto; flex: 1; padding: 8px 0; }
+    .list-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #0f172a; transition: background .15s; }
+    .list-item:hover { background: #0f172a; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .list-info { flex: 1; overflow: hidden; }
+    .list-info strong { display: block; font-size: 14px; color: #f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .list-info small { font-size: 11px; color: #64748b; }
+    .list-arrow { color: #475569; font-size: 18px; }
+
+    .leaflet-popup-content-wrapper { background: #1e293b !important; color: #f1f5f9 !important; border-radius: 12px !important; box-shadow: 0 8px 30px rgba(0,0,0,.5) !important; border: 1px solid #334155 !important; }
+    .leaflet-popup-tip { background: #1e293b !important; }
+    .leaflet-popup-content { margin: 14px 16px !important; min-width: 200px; }
+    .popup-nome { font-size: 15px; font-weight: 700; margin-bottom: 10px; color: #f1f5f9; }
+    .popup-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .popup-row label { font-size: 12px; color: #94a3b8; white-space:nowrap; }
+    .popup-row select { flex:1; padding: 4px 8px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #f1f5f9; font-size: 13px; cursor: pointer; }
+    .popup-coords { font-size: 11px; color: #475569; margin-bottom: 2px; }
+    .popup-date { font-size: 11px; color: #475569; margin-bottom: 10px; }
+    .popup-del { width: 100%; padding: 7px; border: 1px solid #7f1d1d; border-radius: 8px; background: #1c0a0a; color: #f87171; font-size: 13px; cursor: pointer; }
+    .popup-del:hover { background: #450a0a; }
+
+    #legenda { position: fixed; bottom: 20px; left: 14px; z-index: 800; background: rgba(15,23,42,.85); backdrop-filter: blur(6px); border: 1px solid #1e3a5f; border-radius: 10px; padding: 10px 14px; font-size: 11px; color: #94a3b8; }
+    #legenda .leg-title { font-weight: 700; color: #93c5fd; margin-bottom: 6px; font-size:12px; }
+    #legenda .leg-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    #legenda .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink:0; }
+  </style>
+</head>
+<body>
+
+<!-- ── Tela de Login ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="icon">🗺</span>
+      <h1>Mapa <span>CTO</span> Vivo</h1>
+      <p>Faça login para acessar o mapa</p>
+    </div>
+
+    <!-- Google -->
+    <button class="btn-google" id="btn-google-login">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Entrar com Google
+    </button>
+
+    <div class="divider"><span>ou use email e senha</span></div>
+
+    <!-- Tabs login/registro -->
+    <div class="login-tabs">
+      <button class="login-tab active" id="tab-login" onclick="switchTab('login')">Entrar</button>
+      <button class="login-tab" id="tab-registro" onclick="switchTab('registro')">Criar conta</button>
+    </div>
+
+    <!-- Formulário -->
+    <div class="auth-form">
+      <input type="email" id="auth-email" placeholder="Email" autocomplete="email" />
+      <input type="password" id="auth-senha" placeholder="Senha" autocomplete="current-password" />
+      <button class="btn-auth" id="btn-auth-submit">Entrar</button>
+      <div class="auth-msg" id="auth-msg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── App (visível após login) ── -->
+<div id="app">
+  <div id="topbar">
+    <div class="logo">🗺 Mapa <span>CTO</span> Vivo</div>
+    <span class="badge" id="cto-count-badge">0 CTOs</span>
+    <div class="user-info">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <button id="btn-logout" title="Sair">Sair</button>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="fab-group">
+    <button class="fab" id="btn-gps" title="Minha localização">📍</button>
+    <button class="fab" id="btn-lista" title="Lista de CTOs">☰</button>
+  </div>
+
+  <div id="hint">Toque no mapa ou use 📍 para registrar uma CTO</div>
+
+  <div id="legenda">
+    <div class="leg-title">Legenda</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#22c55e"></div> Ativa</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#f59e0b"></div> Em manutenção</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#ef4444"></div> Danificada</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#6b7280"></div> Desconhecida</div>
+  </div>
+
+  <div id="modal">
+    <div id="modal-backdrop"></div>
+    <div class="modal-card">
+      <h2>Nova Caixa CTO</h2>
+      <form id="form-cto">
+        <div class="form-group">
+          <label>Nome / Código</label>
+          <input id="f-nome" type="text" placeholder="Ex: CTO-001 / Rua das Flores" required maxlength="80" />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="f-status">
+            <option>Ativa</option>
+            <option>Em manutenção</option>
+            <option>Danificada</option>
+            <option>Desconhecida</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" id="btn-cancelar">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btn-salvar">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="painel">
+    <div class="painel-header">
+      <div>
+        <h3>Caixas CTO cadastradas</h3>
+        <div id="cto-count" style="font-size:12px;color:#93c5fd;margin-top:2px">0 CTOs</div>
+      </div>
+      <button id="btn-fechar-painel">✕</button>
+    </div>
+    <ul id="lista-ctos"></ul>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  //  COLE AQUI SUAS CREDENCIAIS DO SUPABASE
+  // ============================================================
+  const SUPABASE_URL = "COLE_AQUI";
+  const SUPABASE_KEY = "COLE_AQUI";
+  // ============================================================
+
+  const TABLE = "ctos";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // ── Auth ──────────────────────────────────────────────────────
+  let currentTab = "login";
+  let mapInitialized = false;
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById("tab-login").classList.toggle("active", tab === "login");
+    document.getElementById("tab-registro").classList.toggle("active", tab === "registro");
+    document.getElementById("btn-auth-submit").textContent = tab === "login" ? "Entrar" : "Criar conta";
+    document.getElementById("auth-msg").textContent = "";
+    document.getElementById("auth-msg").className = "auth-msg";
+  }
+
+  document.getElementById("btn-google-login").onclick = async () => {
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.href }
+    });
+    if (error) showAuthMsg(error.message, "error");
+  };
+
+  document.getElementById("btn-auth-submit").onclick = async () => {
+    const email = document.getElementById("auth-email").value.trim();
+    const senha = document.getElementById("auth-senha").value;
+    const btn   = document.getElementById("btn-auth-submit");
+    if (!email || !senha) return showAuthMsg("Preencha email e senha.", "error");
+
+    btn.disabled = true;
+    btn.textContent = "Aguarde…";
+
+    let result;
+    if (currentTab === "login") {
+      result = await sb.auth.signInWithPassword({ email, password: senha });
+    } else {
+      result = await sb.auth.signUp({ email, password: senha });
+    }
+
+    btn.disabled = false;
+    btn.textContent = currentTab === "login" ? "Entrar" : "Criar conta";
+
+    if (result.error) {
+      showAuthMsg(translateAuthError(result.error.message), "error");
+    } else if (currentTab === "registro" && !result.data?.session) {
+      showAuthMsg("Conta criada! Verifique seu email para confirmar.", "success");
+    }
+  };
+
+  document.getElementById("auth-email").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("btn-auth-submit").click(); });
+  document.getElementById("auth-senha").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("btn-auth-submit").click(); });
+
+  function showAuthMsg(msg, type) {
+    const el = document.getElementById("auth-msg");
+    el.textContent = msg;
+    el.className = "auth-msg " + type;
+  }
+
+  function translateAuthError(msg) {
+    if (msg.includes("Invalid login")) return "Email ou senha incorretos.";
+    if (msg.includes("Email not confirmed")) return "Confirme seu email antes de entrar.";
+    if (msg.includes("User already registered")) return "Email já cadastrado. Tente entrar.";
+    if (msg.includes("Password should be")) return "A senha deve ter no mínimo 6 caracteres.";
+    return msg;
+  }
+
+  function showUserInfo(user) {
+    const avatar = document.getElementById("user-avatar");
+    const meta   = user.user_metadata;
+    if (meta?.avatar_url) {
+      avatar.innerHTML = '<img src="' + meta.avatar_url + '" alt="avatar" />';
+    } else {
+      const initial = (meta?.full_name || user.email || "?")[0].toUpperCase();
+      avatar.textContent = initial;
+    }
+  }
+
+  // ── Escuta mudanças de sessão ─────────────────────────────────
+  sb.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      document.getElementById("login-screen").style.display = "none";
+      document.getElementById("app").style.display = "block";
+      showUserInfo(session.user);
+      if (!mapInitialized) { initMap(); mapInitialized = true; }
+    } else {
+      document.getElementById("login-screen").style.display = "flex";
+      document.getElementById("app").style.display = "none";
+    }
+  });
+
+  document.getElementById("btn-logout").onclick = () => sb.auth.signOut();
+
+  // ── Mapa ──────────────────────────────────────────────────────
+  let map, markers = {}, pendingLatLng = null, tempMarker = null;
+
+  function initMap() {
+    map = L.map("map", { zoomControl: false }).setView([-23.55, -46.63], 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors", maxZoom: 20
+    }).addTo(map);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+
+    map.on("click", e => {
+      if (document.getElementById("modal").style.display === "flex") return;
+      pendingLatLng = e.latlng;
+      placeTempMarker(e.latlng);
+      openModal();
+    });
+
+    loadCtos();
+
+    document.getElementById("btn-gps").onclick = () => {
+      if (!navigator.geolocation) return alert("GPS não disponível.");
+      document.getElementById("btn-gps").classList.add("loading");
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          document.getElementById("btn-gps").classList.remove("loading");
+          const ll = L.latLng(pos.coords.latitude, pos.coords.longitude);
+          map.flyTo(ll, 17); pendingLatLng = ll; placeTempMarker(ll); openModal();
+        },
+        () => { document.getElementById("btn-gps").classList.remove("loading"); alert("Não foi possível obter localização."); },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    };
+  }
+
+  async function loadCtos() {
+    const { data, error } = await sb.from(TABLE).select("*");
+    if (error) { console.error(error.message); return; }
+    data.forEach(row => addMarker(row));
+
+    sb.channel("ctos-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, payload => {
+        if (payload.eventType === "INSERT") addMarker(payload.new);
+        else if (payload.eventType === "UPDATE") { removeMarker(payload.new.id); addMarker(payload.new); }
+        else if (payload.eventType === "DELETE") { removeMarker(payload.old.id); removeListItem(payload.old.id); }
+      }).subscribe();
+  }
+
+  function makeIcon(status) {
+    const colors = { "Ativa":"#22c55e","Em manutenção":"#f59e0b","Danificada":"#ef4444","Desconhecida":"#6b7280" };
+    const c = colors[status] || "#6b7280";
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 0C7.163 0 0 7.163 0 16c0 10 16 24 16 24s16-14 16-24C32 7.163 24.837 0 16 0z" fill="' + c + '" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="7" fill="#fff" opacity="0.9"/><text x="16" y="20" text-anchor="middle" font-size="10" font-weight="bold" fill="' + c + '">CTO</text></svg>';
+    return L.divIcon({ html: svg, className: "", iconSize:[32,40], iconAnchor:[16,40], popupAnchor:[0,-40] });
+  }
+
+  function addMarker(row) {
+    const m = L.marker([row.lat, row.lng], { icon: makeIcon(row.status) }).addTo(map).bindPopup(buildPopupHTML(row));
+    markers[row.id] = m;
+    upsertListItem(row);
+  }
+
+  function removeMarker(id) {
+    if (markers[id]) { markers[id].remove(); delete markers[id]; }
+  }
+
+  function placeTempMarker(ll) {
+    if (tempMarker) tempMarker.remove();
+    tempMarker = L.circleMarker(ll, { radius:8, color:"#6366f1", fillColor:"#818cf8", fillOpacity:0.7, weight:2 }).addTo(map);
+  }
+
+  document.getElementById("form-cto").onsubmit = async e => {
+    e.preventDefault();
+    if (!pendingLatLng) return;
+    const btn = document.getElementById("btn-salvar");
+    btn.disabled = true; btn.textContent = "Salvando…";
+    const { error } = await sb.from(TABLE).insert({
+      nome: document.getElementById("f-nome").value.trim(),
+      status: document.getElementById("f-status").value,
+      lat: pendingLatLng.lat, lng: pendingLatLng.lng
+    });
+    if (error) alert("Erro ao salvar: " + error.message);
+    else closeModal();
+    btn.disabled = false; btn.textContent = "Salvar";
+  };
+
+  window.deleteCto = async id => {
+    if (!confirm("Remover esta CTO?")) return;
+    await sb.from(TABLE).delete().eq("id", id);
+    map.closePopup();
+  };
+
+  window.changeStatus = async (id, newStatus) => {
+    await sb.from(TABLE).update({ status: newStatus }).eq("id", id);
+    map.closePopup();
+  };
+
+  window.focusMarker = id => {
+    const m = markers[id];
+    if (m) { map.flyTo(m.getLatLng(), 18); setTimeout(() => m.openPopup(), 600); document.getElementById("painel").classList.remove("open"); }
+  };
+
+  function openModal() {
+    document.getElementById("f-nome").value = "";
+    document.getElementById("f-status").value = "Ativa";
+    document.getElementById("modal").style.display = "flex";
+    document.getElementById("f-nome").focus();
+  }
+  function closeModal() {
+    document.getElementById("modal").style.display = "none";
+    pendingLatLng = null;
+    if (tempMarker) { tempMarker.remove(); tempMarker = null; }
+  }
+  document.getElementById("btn-cancelar").onclick = closeModal;
+  document.getElementById("modal-backdrop").onclick = closeModal;
+
+  function buildPopupHTML(row) {
+    const dt = row.criado ? new Date(row.criado).toLocaleString("pt-BR") : "—";
+    const opts = ["Ativa","Em manutenção","Danificada","Desconhecida"].map(s => '<option ' + (s===row.status?"selected":"") + '>' + s + '</option>').join("");
+    return '<div class="popup"><div class="popup-nome">' + escHtml(row.nome) + '</div><div class="popup-row"><label>Status:</label><select onchange="changeStatus(\'' + row.id + '\', this.value)">' + opts + '</select></div><div class="popup-coords">' + row.lat.toFixed(6) + ', ' + row.lng.toFixed(6) + '</div><div class="popup-date">' + dt + '</div><button class="popup-del" onclick="deleteCto(\'' + row.id + '\')">🗑 Remover</button></div>';
+  }
+
+  function upsertListItem(row) {
+    let li = document.getElementById("li-" + row.id);
+    if (!li) { li = document.createElement("li"); li.id = "li-" + row.id; document.getElementById("lista-ctos").appendChild(li); }
+    const colors = { "Ativa":"#22c55e","Em manutenção":"#f59e0b","Danificada":"#ef4444","Desconhecida":"#6b7280" };
+    const c = colors[row.status] || "#6b7280";
+    li.innerHTML = '<div class="list-item" onclick="focusMarker(\'' + row.id + '\')"><span class="dot" style="background:' + c + '"></span><div class="list-info"><strong>' + escHtml(row.nome) + '</strong><small>' + row.status + '</small></div><span class="list-arrow">›</span></div>';
+    updateCount();
+  }
+
+  function removeListItem(id) {
+    const li = document.getElementById("li-" + id);
+    if (li) li.remove();
+    updateCount();
+  }
+
+  function updateCount() {
+    const n = document.querySelectorAll("#lista-ctos li").length;
+    const txt = n + " CTO" + (n !== 1 ? "s" : "");
+    document.getElementById("cto-count").textContent = txt;
+    document.getElementById("cto-count-badge").textContent = txt;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  document.getElementById("btn-lista").onclick = () => document.getElementById("painel").classList.toggle("open");
+  document.getElementById("btn-fechar-painel").onclick = () => document.getElementById("painel").classList.remove("open");
+</script>
+</body>
+</html>
