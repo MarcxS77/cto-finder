@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_KEY
-const ADMIN_EMAIL   = 'marcosviniciiusz77@gmail.com'
+const ADMIN_EMAILS  = ['marcosviniciiusz77@gmail.com', 'marcos.pbeng@gmail.com']
 const TABLE         = 'ctos'
 const credenciaisOk = !!SUPABASE_URL && !!SUPABASE_KEY
 
@@ -98,7 +98,7 @@ if (sb) {
   sb.auth.onAuthStateChange((event, session) => {
     if (session) {
       currentUser = session.user
-      isAdmin     = currentUser.email === ADMIN_EMAIL
+      isAdmin     = ADMIN_EMAILS.includes(currentUser.email)
       document.getElementById('login-screen').style.display = 'none'
       document.getElementById('app').style.display = 'block'
       showUserInfo(currentUser)
