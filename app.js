@@ -251,7 +251,71 @@ function placeTempMarker(ll) {
   }).addTo(map)
 }
 
-// ── Geocodificação (Nominatim / OpenStreetMap) ────────────────
+// ── Geocodificação + Autocomplete (Nominatim) ─────────────────
+function setGeocodeMsg(msg, type) {
+  const el = document.getElementById('geocode-msg')
+  el.textContent = msg
+  el.className   = 'geocode-msg ' + (type || '')
+}
+
+function hideAutocomplete() {
+  const list = document.getElementById('autocomplete-list')
+  if (list) { list.innerHTML = ''; list.style.display = 'none' }
+}
+
+function showAutocomplete(results) {
+  const list = document.getElementById('autocomplete-list')
+  list.innerHTML = ''
+  if (!results.length) { list.style.display = 'none'; return }
+
+  results.forEach((r) => {
+    const addr   = r.address || {}
+    const bairro = addr.suburb || addr.neighbourhood || addr.city_district || addr.quarter || ''
+    const rua    = addr.road || addr.pedestrian || addr.path || r.display_name.split(',')[0]
+    const cidade = addr.city || addr.town || addr.village || ''
+
+    const item = document.createElement('div')
+    item.className = 'autocomplete-item'
+    item.innerHTML = `
+      <div class="ac-rua">${escHtml(rua)}</div>
+      <div class="ac-bairro">${escHtml([bairro, cidade].filter(Boolean).join(' · '))}</div>`
+
+    item.onmousedown = (e) => {
+      e.preventDefault()
+      document.getElementById('f-endereco').value = rua
+      document.getElementById('f-bairro').value   = bairro
+      pendingLatLng = L.latLng(parseFloat(r.lat), parseFloat(r.lon))
+      placeTempMarker(pendingLatLng)
+      map.flyTo(pendingLatLng, 17)
+      hideAutocomplete()
+      setGeocodeMsg('✓ Localização definida — ' + (bairro || cidade), 'success')
+    }
+    list.appendChild(item)
+  })
+  list.style.display = 'block'
+}
+
+let acTimer = null
+document.getElementById('f-endereco').addEventListener('input', () => {
+  clearTimeout(acTimer)
+  const val = document.getElementById('f-endereco').value.trim()
+  if (val.length < 4) return hideAutocomplete()
+  acTimer = setTimeout(async () => {
+    try {
+      const bairroHint = document.getElementById('f-bairro').value.trim()
+      const query = [val, bairroHint].filter(Boolean).join(', ')
+      const url   = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&countrycodes=br&addressdetails=1`
+      const res   = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
+      const data  = await res.json()
+      showAutocomplete(data)
+    } catch (_) {}
+  }, 400)
+})
+
+document.getElementById('f-endereco').addEventListener('blur', () => {
+  setTimeout(hideAutocomplete, 150)
+})
+
 async function geocodeAddress(endereco, bairro) {
   try {
     const query = [endereco, bairro].filter(Boolean).join(', ')
@@ -261,28 +325,6 @@ async function geocodeAddress(endereco, bairro) {
     if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
   } catch (_) {}
   return null
-}
-
-function setGeocodeMsg(msg, type) {
-  const el = document.getElementById('geocode-msg')
-  el.textContent = msg
-  el.className   = 'geocode-msg ' + type
-}
-
-document.getElementById('btn-geocode').onclick = async () => {
-  const endereco = document.getElementById('f-endereco').value.trim()
-  const bairro   = document.getElementById('f-bairro').value.trim()
-  if (!endereco && !bairro) return setGeocodeMsg('Digite o endereço ou bairro primeiro.', 'error')
-  setGeocodeMsg('Buscando…', '')
-  const coords = await geocodeAddress(endereco, bairro)
-  if (coords) {
-    pendingLatLng = L.latLng(coords.lat, coords.lng)
-    placeTempMarker(pendingLatLng)
-    map.flyTo(pendingLatLng, 17)
-    setGeocodeMsg('✓ Localização encontrada!', 'success')
-  } else {
-    setGeocodeMsg('Endereço não encontrado. Tente ser mais específico.', 'error')
-  }
 }
 
 // ── CTO: salvar, deletar, alterar status ──────────────────────
@@ -295,14 +337,14 @@ document.getElementById('form-cto').onsubmit = async (e) => {
   const bairro = document.getElementById('f-bairro').value.trim()
 
   if (!pendingLatLng) {
-    if (!endereco && !bairro) return setGeocodeMsg('Clique no mapa, use o GPS ou preencha o endereço.', 'error')
-    btn.disabled = true
-    btn.textContent = 'Buscando endereço…'
-    setGeocodeMsg('Buscando…', '')
+    if (!endereco && !bairro) return setGeocodeMsg('Selecione um endereço na lista ou clique no mapa.', 'error')
+    btn.disabled    = true
+    btn.textContent = 'Buscando…'
+    setGeocodeMsg('Buscando localização…', '')
     const coords = await geocodeAddress(endereco, bairro)
     if (!coords) {
-      setGeocodeMsg('Endereço não encontrado. Ajuste o texto ou clique no mapa.', 'error')
-      btn.disabled = false
+      setGeocodeMsg('Endereço não encontrado. Selecione uma sugestão da lista.', 'error')
+      btn.disabled    = false
       btn.textContent = 'Salvar'
       return
     }

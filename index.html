@@ -87,15 +87,15 @@
       <form id="form-cto">
         <div class="form-group">
           <label>Endereço</label>
-          <input id="f-endereco" type="text" placeholder="Ex: Rua das Flores, 123" maxlength="120" />
-        </div>
-        <div class="form-group">
-          <label>Bairro</label>
-          <div class="input-with-btn">
-            <input id="f-bairro" type="text" placeholder="Ex: Centro" maxlength="80" />
-            <button type="button" id="btn-geocode" title="Buscar no mapa">🔍</button>
+          <div class="autocomplete-wrap">
+            <input id="f-endereco" type="text" placeholder="Digite a rua para ver sugestões…" maxlength="120" autocomplete="off" />
+            <div id="autocomplete-list" class="autocomplete-list"></div>
           </div>
           <div id="geocode-msg" class="geocode-msg"></div>
+        </div>
+        <div class="form-group">
+          <label>Bairro <span class="label-auto">(preenchido automaticamente)</span></label>
+          <input id="f-bairro" type="text" placeholder="Selecione um endereço acima" maxlength="80" />
         </div>
         <div class="form-group">
           <label>Área</label>
