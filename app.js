@@ -254,6 +254,7 @@ document.getElementById('form-cto').onsubmit = async (e) => {
   btn.textContent = 'Salvando…'
 
   const { error } = await sb.from(TABLE).insert({
+    endereco:  document.getElementById('f-endereco').value.trim(),
     area_cabo: document.getElementById('f-area-cabo').value.trim(),
     sp:        document.getElementById('f-sp').value.trim(),
     sec:       document.getElementById('f-sec').value.trim(),
@@ -291,12 +292,13 @@ window.focusMarker = (id) => {
 
 // ── Modal ─────────────────────────────────────────────────────
 function openModal() {
+  document.getElementById('f-endereco').value  = ''
   document.getElementById('f-area-cabo').value = ''
   document.getElementById('f-sp').value        = ''
   document.getElementById('f-sec').value       = ''
   document.getElementById('f-status').value    = 'Ativa'
   document.getElementById('modal').style.display = 'flex'
-  document.getElementById('f-area-cabo').focus()
+  document.getElementById('f-endereco').focus()
 }
 
 function closeModal() {
@@ -314,6 +316,8 @@ function buildPopupHTML(row) {
   const opts = ['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida']
     .map((s) => `<option ${s === row.status ? 'selected' : ''}>${s}</option>`)
     .join('')
+  const endereco = row.endereco
+    ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml(row.endereco)}</div>` : ''
   const areaCabo = row.area_cabo
     ? `<div class="popup-meta"><span class="popup-tag">ÁREA</span> ${escHtml(row.area_cabo)}</div>` : ''
   const sp  = row.sp
@@ -323,7 +327,7 @@ function buildPopupHTML(row) {
   return `
     <div class="popup">
       <div class="popup-nome">${escHtml(row.area_cabo || 'CTO')}</div>
-      ${sp}${sec}${areaCabo}
+      ${endereco}${areaCabo}${sp}${sec}
       <div class="popup-row">
         <label>Status:</label>
         <select onchange="changeStatus('${row.id}', this.value)">${opts}</select>
@@ -352,7 +356,7 @@ function upsertListItem(row) {
       <span class="dot" style="background:${c}"></span>
       <div class="list-info">
         <strong>${escHtml(row.area_cabo || 'CTO')}</strong>
-        <small>${row.status}${row.sp ? ' · SP ' + escHtml(row.sp) : ''}${row.sec ? ' · ' + escHtml(row.sec) : ''}</small>
+        <small>${row.status}${row.endereco ? ' · ' + escHtml(row.endereco) : ''}${row.sp ? ' · SP ' + escHtml(row.sp) : ''}</small>
       </div>
       <span class="list-arrow">›</span>
     </div>`
