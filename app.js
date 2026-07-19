@@ -116,12 +116,12 @@ function handleSession(session) {
 }
 
 if (sb) {
-  // Verifica sessão existente ao carregar (captura redirect do OAuth)
-  sb.auth.getSession().then(({ data: { session } }) => handleSession(session))
+  // Detecta se há código OAuth na URL (redirect do Google)
+  const temCodigoOAuth = new URLSearchParams(window.location.search).has('code')
 
-  // Escuta mudanças posteriores
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === 'INITIAL_SESSION') return // já tratado pelo getSession acima
+    // Se veio de redirect OAuth e ainda não temos sessão, aguarda a troca do código
+    if (event === 'INITIAL_SESSION' && !session && temCodigoOAuth) return
     handleSession(session)
   })
 }
