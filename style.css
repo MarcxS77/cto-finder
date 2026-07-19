@@ -272,9 +272,31 @@ body {
   transition: transform 0.15s, opacity 0.15s;
 }
 .fab:active { transform: scale(0.92); }
-#btn-add   { background: #16a34a; color: #fff; font-size: 26px; line-height: 1; }
-#btn-gps   { background: #1d4ed8; color: #fff; }
-#btn-lista { background: #0f172a; color: #60a5fa; border: 2px solid #1e3a5f; }
+#btn-add       { background: #16a34a; color: #fff; font-size: 26px; line-height: 1; }
+#btn-gps       { background: #1d4ed8; color: #fff; }
+#btn-lista     { background: #0f172a; color: #60a5fa; border: 2px solid #1e3a5f; }
+.fab-admin     { background: #92400e; color: #fcd34d; border: 2px solid #78350f; }
+
+.pendentes-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Marcador pendente pulsando */
+.marker-pendente { animation: pulse-marker 1.5s ease-in-out infinite; }
+@keyframes pulse-marker {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.15); opacity: 0.8; }
+}
 .fab.loading { opacity: 0.6; pointer-events: none; }
 
 /* Hint */
@@ -442,6 +464,67 @@ body {
   background: transparent;
   color: #94a3b8;
   font-size: 15px;
+  cursor: pointer;
+}
+
+/* Painel admin */
+#painel-admin {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 300px;
+  max-width: 90vw;
+  background: #1c1008;
+  z-index: 950;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.5);
+}
+#painel-admin.open { transform: translateX(0); }
+#lista-pendentes { list-style: none; overflow-y: auto; flex: 1; padding: 8px 0; }
+
+.pendente-item { align-items: flex-start !important; }
+.pendente-btns { display: flex; gap: 6px; margin-left: 4px; flex-shrink: 0; }
+.btn-aprovar-sm, .btn-rejeitar-sm {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-aprovar-sm  { background: #166534; color: #4ade80; }
+.btn-rejeitar-sm { background: #7f1d1d; color: #f87171; }
+
+/* Popup admin */
+.popup-pendente-tag {
+  font-size: 11px;
+  color: #fcd34d;
+  background: #78350f;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: inline-block;
+}
+.popup-actions-admin {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.btn-aprovar {
+  flex: 1; padding: 8px;
+  border: none; border-radius: 8px;
+  background: #166534; color: #4ade80;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+}
+.btn-rejeitar {
+  flex: 1; padding: 8px;
+  border: none; border-radius: 8px;
+  background: #7f1d1d; color: #f87171;
+  font-size: 13px; font-weight: 700;
   cursor: pointer;
 }
 
