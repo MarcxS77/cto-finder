@@ -102,11 +102,15 @@ document.getElementById('auth-senha').addEventListener('keydown', (e) => {
 
 if (!credenciaisOk) showAuthMsg('⚠️ Configure as variáveis de ambiente no arquivo .env.', 'error')
 
+// Detecta se há tokens OAuth na URL (implicit flow retorna no hash)
+const isOAuthRedirect = window.location.hash.includes('access_token') ||
+                        window.location.search.includes('code=')
+
 function handleSession(session) {
-  document.getElementById('loading-screen').style.display = 'none'
   if (session) {
     currentUser = session.user
     isAdmin     = ADMIN_EMAILS.includes(currentUser.email)
+    document.getElementById('loading-screen').style.display = 'none'
     document.getElementById('login-screen').style.display = 'none'
     document.getElementById('app').style.display = 'block'
     showUserInfo(currentUser)
@@ -118,8 +122,13 @@ function handleSession(session) {
   } else {
     currentUser = null
     isAdmin     = false
-    document.getElementById('login-screen').style.display = 'flex'
-    document.getElementById('app').style.display = 'none'
+    // Só mostra login se NÃO estiver processando redirect OAuth
+    if (!isOAuthRedirect) {
+      document.getElementById('loading-screen').style.display = 'none'
+      document.getElementById('login-screen').style.display = 'flex'
+      document.getElementById('app').style.display = 'none'
+    }
+    // Se for redirect OAuth, mantém o loading até o SIGNED_IN disparar
   }
 }
 
