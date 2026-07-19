@@ -94,26 +94,35 @@ document.getElementById('auth-senha').addEventListener('keydown', (e) => {
 
 if (!credenciaisOk) showAuthMsg('⚠️ Configure as variáveis de ambiente no arquivo .env.', 'error')
 
-if (sb) {
-  sb.auth.onAuthStateChange((event, session) => {
-    if (session) {
-      currentUser = session.user
-      isAdmin     = ADMIN_EMAILS.includes(currentUser.email)
-      document.getElementById('login-screen').style.display = 'none'
-      document.getElementById('app').style.display = 'block'
-      showUserInfo(currentUser)
-      // Mostra botão admin apenas para o admin
-      if (isAdmin) {
-        document.getElementById('btn-pendentes').style.display = 'flex'
-        document.getElementById('admin-badge-wrap').style.display = 'block'
-      }
-      if (!mapInitialized) { initMap(); mapInitialized = true }
-    } else {
-      currentUser = null
-      isAdmin     = false
-      document.getElementById('login-screen').style.display = 'flex'
-      document.getElementById('app').style.display = 'none'
+function handleSession(session) {
+  document.getElementById('loading-screen').style.display = 'none'
+  if (session) {
+    currentUser = session.user
+    isAdmin     = ADMIN_EMAILS.includes(currentUser.email)
+    document.getElementById('login-screen').style.display = 'none'
+    document.getElementById('app').style.display = 'block'
+    showUserInfo(currentUser)
+    if (isAdmin) {
+      document.getElementById('btn-pendentes').style.display = 'flex'
+      document.getElementById('admin-badge-wrap').style.display = 'block'
     }
+    if (!mapInitialized) { initMap(); mapInitialized = true }
+  } else {
+    currentUser = null
+    isAdmin     = false
+    document.getElementById('login-screen').style.display = 'flex'
+    document.getElementById('app').style.display = 'none'
+  }
+}
+
+if (sb) {
+  // Verifica sessão existente ao carregar (captura redirect do OAuth)
+  sb.auth.getSession().then(({ data: { session } }) => handleSession(session))
+
+  // Escuta mudanças posteriores
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'INITIAL_SESSION') return // já tratado pelo getSession acima
+    handleSession(session)
   })
 }
 
