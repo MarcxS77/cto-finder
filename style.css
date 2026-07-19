@@ -493,8 +493,8 @@ body {
 #painel-admin {
   position: fixed;
   top: 0; right: 0; bottom: 0;
-  width: 300px;
-  max-width: 90vw;
+  width: 320px;
+  max-width: 92vw;
   background: #1c1008;
   z-index: 950;
   transform: translateX(100%);
@@ -504,7 +504,95 @@ body {
   box-shadow: -4px 0 24px rgba(0,0,0,0.5);
 }
 #painel-admin.open { transform: translateX(0); }
-#lista-pendentes { list-style: none; overflow-y: auto; flex: 1; padding: 8px 0; }
+
+/* Admin tabs */
+.admin-tabs {
+  display: flex;
+  background: #0f0700;
+  border-bottom: 1px solid #3b1a00;
+  flex-shrink: 0;
+}
+.admin-tab {
+  flex: 1;
+  padding: 11px 8px;
+  border: none;
+  background: transparent;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.admin-tab.active {
+  color: #fcd34d;
+  border-bottom-color: #f59e0b;
+  background: rgba(245,158,11,0.08);
+}
+.admin-tab-badge {
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-list { list-style: none; overflow-y: auto; flex: 1; padding: 8px 0; }
+
+/* Todas as CTOs — items */
+.todas-item { padding: 10px 12px !important; }
+.todas-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+.todas-btn {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s;
+}
+.todas-btn:active { opacity: 0.6; }
+.edit-btn { background: #1e3a5f; }
+.del-btn  { background: #450a0a; }
+.todas-badge {
+  font-size: 10px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Modal de edição */
+#modal-edit {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  align-items: flex-end;
+  justify-content: center;
+}
+#modal-edit-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(3px);
+}
+#modal-edit .modal-card {
+  max-height: 90dvh;
+  overflow-y: auto;
+}
 
 .pendente-item { align-items: flex-start !important; }
 .pendente-btns { display: flex; gap: 6px; margin-left: 4px; flex-shrink: 0; }
@@ -581,13 +669,15 @@ body {
   font-size: 12px;
   color: #93c5fd;
 }
-#btn-fechar-painel {
+#btn-fechar-painel,
+#btn-fechar-admin {
   background: none;
   border: none;
   color: #94a3b8;
   font-size: 20px;
   cursor: pointer;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 #lista-ctos {

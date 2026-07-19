@@ -143,7 +143,7 @@ document.getElementById('btn-logout').onclick = () => { if (sb) sb.auth.signOut(
 // ══════════════════════════════════════
 //  MAPA
 // ══════════════════════════════════════
-let map, markers = {}, pendingLatLng = null, tempMarker = null
+let map, markers = {}, pendingLatLng = null, tempMarker = null, ctoData = {}
 
 function initMap() {
   map = L.map('map', { zoomControl: false }).setView([-23.55, -46.63], 14)
@@ -223,6 +223,7 @@ async function loadCtos() {
         removeMarker(row.id)
         removeListItem(row.id)
         removePendenteItem(row.id)
+        removeTodasItem(row.id)
         if (row.status_aprovacao === 'aprovado') {
           addMarker(row)
         } else if (isAdmin && row.status_aprovacao === 'pendente') {
@@ -233,6 +234,7 @@ async function loadCtos() {
         removeMarker(row.id)
         removeListItem(row.id)
         removePendenteItem(row.id)
+        removeTodasItem(row.id)
         updatePendenteCount()
       }
     })
@@ -268,21 +270,26 @@ function makeIconPendente() {
 }
 
 function addMarker(row) {
+  ctoData[row.id] = row
   const m = L.marker([row.lat, row.lng], { icon: makeIcon(row.status) })
     .addTo(map).bindPopup(buildPopupHTML(row))
   markers[row.id] = m
   upsertListItem(row)
+  if (isAdmin) upsertTodasItem(row)
 }
 
 function addMarkerPendente(row) {
+  ctoData[row.id] = row
   const m = L.marker([row.lat, row.lng], { icon: makeIconPendente() })
     .addTo(map).bindPopup(buildPopupPendenteHTML(row))
   markers[row.id] = m
   upsertPendenteItem(row)
+  if (isAdmin) upsertTodasItem(row)
 }
 
 function removeMarker(id) {
   if (markers[id]) { markers[id].remove(); delete markers[id] }
+  delete ctoData[id]
 }
 
 function placeTempMarker(ll) {
@@ -322,11 +329,13 @@ function showAutocomplete(results) {
       e.preventDefault()
       document.getElementById('f-endereco').value = rua
       document.getElementById('f-bairro').value   = bairro
+      // Centra o mapa na rua; número refinará depois ao salvar
       pendingLatLng = L.latLng(parseFloat(r.lat), parseFloat(r.lon))
       placeTempMarker(pendingLatLng)
       map.flyTo(pendingLatLng, 17)
       hideAutocomplete()
-      setGeocodeMsg('✓ Localização definida — ' + (bairro || cidade), 'success')
+      setGeocodeMsg('✓ Rua encontrada — preencha o número para maior precisão', 'success')
+      document.getElementById('f-numero').focus()
     }
     list.appendChild(item)
   })
@@ -351,9 +360,10 @@ document.getElementById('f-endereco').addEventListener('input', () => {
 })
 document.getElementById('f-endereco').addEventListener('blur', () => setTimeout(hideAutocomplete, 150))
 
-async function geocodeAddress(endereco, bairro) {
+async function geocodeAddress(endereco, numero, bairro) {
   try {
-    const query = [endereco, bairro].filter(Boolean).join(', ')
+    const endComNumero = [endereco, numero].filter(Boolean).join(', ')
+    const query = [endComNumero, bairro].filter(Boolean).join(', ')
     const url   = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=br`
     const res   = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
     const data  = await res.json()
@@ -367,13 +377,23 @@ document.getElementById('form-cto').onsubmit = async (e) => {
   e.preventDefault()
   const btn      = document.getElementById('btn-salvar')
   const endereco = document.getElementById('f-endereco').value.trim()
+  const numero   = document.getElementById('f-numero').value.trim()
   const bairro   = document.getElementById('f-bairro').value.trim()
+
+  // Se tem número, refina a localização com o número
+  if (pendingLatLng && numero) {
+    const coords = await geocodeAddress(endereco, numero, bairro)
+    if (coords) {
+      pendingLatLng = L.latLng(coords.lat, coords.lng)
+      placeTempMarker(pendingLatLng)
+    }
+  }
 
   if (!pendingLatLng) {
     if (!endereco && !bairro) return setGeocodeMsg('Selecione um endereço na lista ou clique no mapa.', 'error')
     btn.disabled = true; btn.textContent = 'Buscando…'
     setGeocodeMsg('Buscando localização…', '')
-    const coords = await geocodeAddress(endereco, bairro)
+    const coords = await geocodeAddress(endereco, numero, bairro)
     if (!coords) {
       setGeocodeMsg('Endereço não encontrado. Selecione uma sugestão da lista.', 'error')
       btn.disabled = false; btn.textContent = 'Salvar'
@@ -388,6 +408,7 @@ document.getElementById('form-cto').onsubmit = async (e) => {
 
   const { error } = await sb.from(TABLE).insert({
     endereco:         endereco,
+    numero:           numero,
     bairro:           bairro,
     area_cabo:        document.getElementById('f-area-cabo').value.trim(),
     sp:               document.getElementById('f-sp').value.trim(),
@@ -455,6 +476,7 @@ window.focusMarker = (id) => {
 // ── Modal ─────────────────────────────────────────────────────
 function openModal() {
   document.getElementById('f-endereco').value  = ''
+  document.getElementById('f-numero').value    = ''
   document.getElementById('f-bairro').value    = ''
   document.getElementById('f-area-cabo').value = ''
   document.getElementById('f-sp').value        = ''
@@ -479,8 +501,9 @@ function buildPopupHTML(row) {
   const dt   = row.criado ? new Date(row.criado).toLocaleString('pt-BR') : '—'
   const opts = ['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida']
     .map((s) => `<option ${s === row.status ? 'selected' : ''}>${s}</option>`).join('')
-  const enderecoHtml = row.endereco || row.bairro
-    ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml([row.endereco, row.bairro].filter(Boolean).join(' — '))}</div>` : ''
+  const endFull = [row.endereco, row.numero].filter(Boolean).join(', ')
+  const enderecoHtml = endFull || row.bairro
+    ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml([endFull, row.bairro].filter(Boolean).join(' — '))}</div>` : ''
   const areaCaboHtml = row.area_cabo
     ? `<div class="popup-meta"><span class="popup-tag">ÁREA</span> ${escHtml(row.area_cabo)}</div>` : ''
   const spHtml  = row.sp  ? `<div class="popup-meta"><span class="popup-tag">SP</span> ${escHtml(row.sp)}</div>` : ''
@@ -501,8 +524,9 @@ function buildPopupHTML(row) {
 }
 
 function buildPopupPendenteHTML(row) {
-  const enderecoHtml = row.endereco || row.bairro
-    ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml([row.endereco, row.bairro].filter(Boolean).join(' — '))}</div>` : ''
+  const endFull = [row.endereco, row.numero].filter(Boolean).join(', ')
+  const enderecoHtml = endFull || row.bairro
+    ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml([endFull, row.bairro].filter(Boolean).join(' — '))}</div>` : ''
   const areaCaboHtml = row.area_cabo ? `<div class="popup-meta"><span class="popup-tag">ÁREA</span> ${escHtml(row.area_cabo)}</div>` : ''
   const spHtml  = row.sp  ? `<div class="popup-meta"><span class="popup-tag">SP</span> ${escHtml(row.sp)}</div>` : ''
   const secHtml = row.sec ? `<div class="popup-meta"><span class="popup-tag">SEC</span> ${escHtml(row.sec)}</div>` : ''
@@ -576,9 +600,108 @@ function removePendenteItem(id) {
 
 function updatePendenteCount() {
   const n = document.querySelectorAll('#lista-pendentes li').length
-  const badge = document.getElementById('pendentes-badge')
+  const badge    = document.getElementById('pendentes-badge')
+  const tabBadge = document.getElementById('pendentes-tab-count')
   badge.textContent = n
   badge.style.display = n > 0 ? 'flex' : 'none'
+  if (tabBadge) tabBadge.textContent = n
+}
+
+// ── Painel admin: abas ────────────────────────────────────────
+window.switchAdminTab = function (tab) {
+  document.getElementById('lista-pendentes').style.display = tab === 'pendentes' ? 'block' : 'none'
+  document.getElementById('lista-todas').style.display     = tab === 'todas'     ? 'block' : 'none'
+  document.querySelectorAll('.admin-tab').forEach((t) =>
+    t.classList.toggle('active', t.dataset.tab === tab)
+  )
+}
+
+// ── Lista "Todas as CTOs" (admin) ─────────────────────────────
+function upsertTodasItem(row) {
+  let li = document.getElementById('tai-' + row.id)
+  if (!li) {
+    li = document.createElement('li')
+    li.id = 'tai-' + row.id
+    document.getElementById('lista-todas').appendChild(li)
+  }
+  const colors = {
+    'Ativa': '#22c55e', 'Em manutenção': '#f59e0b',
+    'Danificada': '#ef4444', 'Desconhecida': '#6b7280',
+  }
+  const c = colors[row.status] || '#6b7280'
+  const pendTag = row.status_aprovacao === 'pendente'
+    ? '<span class="todas-badge">⏳</span>' : ''
+  li.innerHTML = `
+    <div class="list-item todas-item">
+      <span class="dot" style="background:${c};flex-shrink:0"></span>
+      <div class="list-info" onclick="focusMarker('${row.id}');document.getElementById('painel-admin').classList.remove('open')" style="cursor:pointer">
+        <strong>${escHtml(row.area_cabo || 'CTO')} ${pendTag}</strong>
+        <small>${escHtml(row.status)}${row.bairro ? ' · ' + escHtml(row.bairro) : ''}${row.endereco ? ' · ' + escHtml(row.endereco) : ''}</small>
+      </div>
+      <div class="todas-actions">
+        <button class="todas-btn edit-btn" title="Editar"  onclick="editCto('${row.id}')">✏️</button>
+        <button class="todas-btn del-btn"  title="Remover" onclick="deleteCtoAdmin('${row.id}')">🗑</button>
+      </div>
+    </div>`
+}
+
+function removeTodasItem(id) {
+  const li = document.getElementById('tai-' + id)
+  if (li) li.remove()
+}
+
+// ── Editar CTO (admin) ────────────────────────────────────────
+window.editCto = function (id) {
+  const row = ctoData[id]
+  if (!row) return
+  document.getElementById('edit-id').value                  = id
+  document.getElementById('edit-endereco').value            = row.endereco  || ''
+  document.getElementById('edit-bairro').value              = row.bairro    || ''
+  document.getElementById('edit-numero').value              = row.numero    || ''
+  document.getElementById('edit-area-cabo').value           = row.area_cabo || ''
+  document.getElementById('edit-sp').value                  = row.sp        || ''
+  document.getElementById('edit-sec').value                 = row.sec       || ''
+  document.getElementById('edit-status').value              = row.status    || 'Ativa'
+  document.getElementById('edit-status-aprovacao').value    = row.status_aprovacao || 'pendente'
+  document.getElementById('edit-msg').textContent           = ''
+  document.getElementById('edit-msg').className             = 'geocode-msg'
+  document.getElementById('modal-edit').style.display      = 'flex'
+}
+
+document.getElementById('btn-edit-cancelar').onclick = () => {
+  document.getElementById('modal-edit').style.display = 'none'
+}
+document.getElementById('modal-edit-backdrop').onclick = () => {
+  document.getElementById('modal-edit').style.display = 'none'
+}
+
+document.getElementById('btn-edit-salvar').onclick = async () => {
+  const id  = document.getElementById('edit-id').value
+  const btn = document.getElementById('btn-edit-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando…'
+  const { error } = await sb.from(TABLE).update({
+    endereco:         document.getElementById('edit-endereco').value.trim(),
+    numero:           document.getElementById('edit-numero').value.trim(),
+    bairro:           document.getElementById('edit-bairro').value.trim(),
+    area_cabo:        document.getElementById('edit-area-cabo').value.trim(),
+    sp:               document.getElementById('edit-sp').value.trim(),
+    sec:              document.getElementById('edit-sec').value.trim(),
+    status:           document.getElementById('edit-status').value,
+    status_aprovacao: document.getElementById('edit-status-aprovacao').value,
+  }).eq('id', id)
+  btn.disabled = false; btn.textContent = 'Salvar'
+  if (error) {
+    const msg = document.getElementById('edit-msg')
+    msg.textContent = 'Erro: ' + error.message
+    msg.className   = 'geocode-msg error'
+  } else {
+    document.getElementById('modal-edit').style.display = 'none'
+  }
+}
+
+window.deleteCtoAdmin = async (id) => {
+  if (!confirm('Remover esta CTO permanentemente?')) return
+  await sb.from(TABLE).delete().eq('id', id)
 }
 
 // ── Painel lateral ────────────────────────────────────────────

@@ -153,16 +153,85 @@
     <ul id="lista-ctos"></ul>
   </div>
 
-  <!-- Painel admin: CTOs pendentes -->
+  <!-- Painel admin completo -->
   <div id="painel-admin">
     <div class="painel-header" style="background:linear-gradient(135deg,#78350f,#451a03)">
       <div>
-        <h3>⏳ CTOs para análise</h3>
+        <h3>⚙️ Painel Admin</h3>
         <div style="font-size:12px;color:#fcd34d;margin-top:2px">Somente visível para você</div>
       </div>
       <button id="btn-fechar-admin">✕</button>
     </div>
-    <ul id="lista-pendentes"></ul>
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-tab="pendentes" onclick="switchAdminTab('pendentes')">
+        ⏳ Pendentes <span id="pendentes-tab-count" class="admin-tab-badge">0</span>
+      </button>
+      <button class="admin-tab" data-tab="todas" onclick="switchAdminTab('todas')">
+        📋 Todas as CTOs
+      </button>
+    </div>
+    <ul id="lista-pendentes" class="admin-list"></ul>
+    <ul id="lista-todas"     class="admin-list" style="display:none"></ul>
+  </div>
+
+  <!-- Modal de edição (admin) -->
+  <div id="modal-edit">
+    <div id="modal-edit-backdrop"></div>
+    <div class="modal-card">
+      <h2 style="margin-bottom:18px">✏️ Editar CTO</h2>
+      <input id="edit-id" type="hidden" />
+      <div class="form-group">
+        <label>Rua / Avenida</label>
+        <input id="edit-endereco" type="text" placeholder="Ex: Rua das Flores" maxlength="120" />
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Bairro</label>
+          <input id="edit-bairro" type="text" maxlength="80" />
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Número</label>
+          <input id="edit-numero" type="text" maxlength="10" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Área</label>
+        <input id="edit-area-cabo" type="text" placeholder="Ex: IPFH02" maxlength="40" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>SP</label>
+          <input id="edit-sp" type="text" maxlength="20" />
+        </div>
+        <div class="form-group">
+          <label>SEC</label>
+          <input id="edit-sec" type="text" maxlength="20" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Status</label>
+          <select id="edit-status">
+            <option>Ativa</option>
+            <option>Em manutenção</option>
+            <option>Danificada</option>
+            <option>Desconhecida</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Aprovação</label>
+          <select id="edit-status-aprovacao">
+            <option value="aprovado">Aprovado</option>
+            <option value="pendente">Pendente</option>
+          </select>
+        </div>
+      </div>
+      <div id="edit-msg" class="geocode-msg" style="margin-bottom:8px"></div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" id="btn-edit-cancelar">Cancelar</button>
+        <button type="button" class="btn-primary"   id="btn-edit-salvar">Salvar</button>
+      </div>
+    </div>
   </div>
 
 </div>
