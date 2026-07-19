@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_KEY
-const ADMIN_EMAILS  = ['marcosviniciiusz77@gmail.com', 'marcos.pbeng@gmail.com']
+const ADMIN_EMAILS  = ['marcos.pbeng@gmail.com']
 const TABLE         = 'ctos'
 const credenciaisOk = !!SUPABASE_URL && !!SUPABASE_KEY
 
