@@ -10,7 +10,15 @@ const credenciaisOk = !!SUPABASE_URL && !!SUPABASE_KEY
 
 let sb = null
 if (credenciaisOk) {
-  try { sb = createClient(SUPABASE_URL, SUPABASE_KEY) }
+  try {
+    sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        flowType: 'implicit',
+        detectSessionInUrl: true,
+        persistSession: true,
+      }
+    })
+  }
   catch (e) { console.error('Erro ao iniciar Supabase:', e) }
 }
 
@@ -116,12 +124,7 @@ function handleSession(session) {
 }
 
 if (sb) {
-  // Detecta se há código OAuth na URL (redirect do Google)
-  const temCodigoOAuth = new URLSearchParams(window.location.search).has('code')
-
   sb.auth.onAuthStateChange((event, session) => {
-    // Se veio de redirect OAuth e ainda não temos sessão, aguarda a troca do código
-    if (event === 'INITIAL_SESSION' && !session && temCodigoOAuth) return
     handleSession(session)
   })
 }
