@@ -254,7 +254,6 @@ document.getElementById('form-cto').onsubmit = async (e) => {
   btn.textContent = 'Salvando…'
 
   const { error } = await sb.from(TABLE).insert({
-    nome:      document.getElementById('f-nome').value.trim(),
     area_cabo: document.getElementById('f-area-cabo').value.trim(),
     sp:        document.getElementById('f-sp').value.trim(),
     sec:       document.getElementById('f-sec').value.trim(),
@@ -292,13 +291,12 @@ window.focusMarker = (id) => {
 
 // ── Modal ─────────────────────────────────────────────────────
 function openModal() {
-  document.getElementById('f-nome').value      = ''
   document.getElementById('f-area-cabo').value = ''
   document.getElementById('f-sp').value        = ''
   document.getElementById('f-sec').value       = ''
   document.getElementById('f-status').value    = 'Ativa'
   document.getElementById('modal').style.display = 'flex'
-  document.getElementById('f-nome').focus()
+  document.getElementById('f-area-cabo').focus()
 }
 
 function closeModal() {
@@ -317,15 +315,15 @@ function buildPopupHTML(row) {
     .map((s) => `<option ${s === row.status ? 'selected' : ''}>${s}</option>`)
     .join('')
   const areaCabo = row.area_cabo
-    ? `<div class="popup-meta"><span class="popup-tag">ÁREA+CABO</span> ${escHtml(row.area_cabo)}</div>` : ''
+    ? `<div class="popup-meta"><span class="popup-tag">ÁREA</span> ${escHtml(row.area_cabo)}</div>` : ''
   const sp  = row.sp
     ? `<div class="popup-meta"><span class="popup-tag">SP</span> ${escHtml(row.sp)}</div>` : ''
   const sec = row.sec
     ? `<div class="popup-meta"><span class="popup-tag">SEC</span> ${escHtml(row.sec)}</div>` : ''
   return `
     <div class="popup">
-      <div class="popup-nome">${escHtml(row.nome)}</div>
-      ${areaCabo}${sp}${sec}
+      <div class="popup-nome">${escHtml(row.area_cabo || 'CTO')}</div>
+      ${sp}${sec}${areaCabo}
       <div class="popup-row">
         <label>Status:</label>
         <select onchange="changeStatus('${row.id}', this.value)">${opts}</select>
@@ -353,8 +351,8 @@ function upsertListItem(row) {
     <div class="list-item" onclick="focusMarker('${row.id}')">
       <span class="dot" style="background:${c}"></span>
       <div class="list-info">
-        <strong>${escHtml(row.nome)}</strong>
-        <small>${row.status}${row.area_cabo ? ' · ' + escHtml(row.area_cabo) : ''}</small>
+        <strong>${escHtml(row.area_cabo || 'CTO')}</strong>
+        <small>${row.status}${row.sp ? ' · SP ' + escHtml(row.sp) : ''}${row.sec ? ' · ' + escHtml(row.sec) : ''}</small>
       </div>
       <span class="list-arrow">›</span>
     </div>`
