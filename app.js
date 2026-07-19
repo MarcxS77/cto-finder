@@ -160,6 +160,12 @@ function initMap() {
 
   loadCtos()
 
+  document.getElementById('btn-add').onclick = () => {
+    pendingLatLng = null
+    if (tempMarker) { tempMarker.remove(); tempMarker = null }
+    openModal()
+  }
+
   document.getElementById('btn-gps').onclick = () => {
     if (!navigator.geolocation) return alert('GPS não disponível.')
     document.getElementById('btn-gps').classList.add('loading')
@@ -245,16 +251,67 @@ function placeTempMarker(ll) {
   }).addTo(map)
 }
 
+// ── Geocodificação (Nominatim / OpenStreetMap) ────────────────
+async function geocodeAddress(address) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=br`
+    const res  = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
+    const data = await res.json()
+    if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+  } catch (_) {}
+  return null
+}
+
+function setGeocodeMsg(msg, type) {
+  const el = document.getElementById('geocode-msg')
+  el.textContent = msg
+  el.className   = 'geocode-msg ' + type
+}
+
+document.getElementById('btn-geocode').onclick = async () => {
+  const endereco = document.getElementById('f-endereco').value.trim()
+  if (!endereco) return setGeocodeMsg('Digite um endereço primeiro.', 'error')
+  setGeocodeMsg('Buscando…', '')
+  const coords = await geocodeAddress(endereco)
+  if (coords) {
+    pendingLatLng = L.latLng(coords.lat, coords.lng)
+    placeTempMarker(pendingLatLng)
+    map.flyTo(pendingLatLng, 17)
+    setGeocodeMsg('✓ Localização encontrada!', 'success')
+  } else {
+    setGeocodeMsg('Endereço não encontrado. Tente ser mais específico.', 'error')
+  }
+}
+
 // ── CTO: salvar, deletar, alterar status ──────────────────────
 document.getElementById('form-cto').onsubmit = async (e) => {
   e.preventDefault()
-  if (!pendingLatLng) return
-  const btn = document.getElementById('btn-salvar')
+  const btn      = document.getElementById('btn-salvar')
+  const endereco = document.getElementById('f-endereco').value.trim()
+
+  // Se não tem localização ainda, tenta geocodificar pelo endereço
+  if (!pendingLatLng) {
+    if (!endereco) return setGeocodeMsg('Clique no mapa, use o GPS ou preencha o endereço.', 'error')
+    btn.disabled = true
+    btn.textContent = 'Buscando endereço…'
+    setGeocodeMsg('Buscando…', '')
+    const coords = await geocodeAddress(endereco)
+    if (!coords) {
+      setGeocodeMsg('Endereço não encontrado. Ajuste o texto ou clique no mapa.', 'error')
+      btn.disabled = false
+      btn.textContent = 'Salvar'
+      return
+    }
+    pendingLatLng = L.latLng(coords.lat, coords.lng)
+    placeTempMarker(pendingLatLng)
+    map.flyTo(pendingLatLng, 17)
+  }
+
   btn.disabled = true
   btn.textContent = 'Salvando…'
 
   const { error } = await sb.from(TABLE).insert({
-    endereco:  document.getElementById('f-endereco').value.trim(),
+    endereco:  endereco,
     area_cabo: document.getElementById('f-area-cabo').value.trim(),
     sp:        document.getElementById('f-sp').value.trim(),
     sec:       document.getElementById('f-sec').value.trim(),

@@ -272,6 +272,7 @@ body {
   transition: transform 0.15s, opacity 0.15s;
 }
 .fab:active { transform: scale(0.92); }
+#btn-add   { background: #16a34a; color: #fff; font-size: 26px; line-height: 1; }
 #btn-gps   { background: #1d4ed8; color: #fff; }
 #btn-lista { background: #0f172a; color: #60a5fa; border: 2px solid #1e3a5f; }
 .fab.loading { opacity: 0.6; pointer-events: none; }
@@ -333,6 +334,35 @@ body {
 .modal-card h2::before { content: "📍"; }
 
 .form-group { margin-bottom: 14px; }
+
+.input-with-btn {
+  display: flex;
+  gap: 8px;
+}
+.input-with-btn input {
+  flex: 1;
+}
+.input-with-btn button {
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1.5px solid #334155;
+  background: #0f172a;
+  color: #93c5fd;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.input-with-btn button:hover { background: #1e3a5f; }
+
+.geocode-msg {
+  font-size: 11px;
+  margin-top: 4px;
+  min-height: 14px;
+  color: #64748b;
+}
+.geocode-msg.success { color: #4ade80; }
+.geocode-msg.error   { color: #f87171; }
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
