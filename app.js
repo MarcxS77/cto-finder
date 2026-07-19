@@ -252,11 +252,12 @@ function placeTempMarker(ll) {
 }
 
 // ── Geocodificação (Nominatim / OpenStreetMap) ────────────────
-async function geocodeAddress(address) {
+async function geocodeAddress(endereco, bairro) {
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=br`
-    const res  = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
-    const data = await res.json()
+    const query = [endereco, bairro].filter(Boolean).join(', ')
+    const url   = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=br`
+    const res   = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
+    const data  = await res.json()
     if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
   } catch (_) {}
   return null
@@ -270,9 +271,10 @@ function setGeocodeMsg(msg, type) {
 
 document.getElementById('btn-geocode').onclick = async () => {
   const endereco = document.getElementById('f-endereco').value.trim()
-  if (!endereco) return setGeocodeMsg('Digite um endereço primeiro.', 'error')
+  const bairro   = document.getElementById('f-bairro').value.trim()
+  if (!endereco && !bairro) return setGeocodeMsg('Digite o endereço ou bairro primeiro.', 'error')
   setGeocodeMsg('Buscando…', '')
-  const coords = await geocodeAddress(endereco)
+  const coords = await geocodeAddress(endereco, bairro)
   if (coords) {
     pendingLatLng = L.latLng(coords.lat, coords.lng)
     placeTempMarker(pendingLatLng)
@@ -290,12 +292,14 @@ document.getElementById('form-cto').onsubmit = async (e) => {
   const endereco = document.getElementById('f-endereco').value.trim()
 
   // Se não tem localização ainda, tenta geocodificar pelo endereço
+  const bairro = document.getElementById('f-bairro').value.trim()
+
   if (!pendingLatLng) {
-    if (!endereco) return setGeocodeMsg('Clique no mapa, use o GPS ou preencha o endereço.', 'error')
+    if (!endereco && !bairro) return setGeocodeMsg('Clique no mapa, use o GPS ou preencha o endereço.', 'error')
     btn.disabled = true
     btn.textContent = 'Buscando endereço…'
     setGeocodeMsg('Buscando…', '')
-    const coords = await geocodeAddress(endereco)
+    const coords = await geocodeAddress(endereco, bairro)
     if (!coords) {
       setGeocodeMsg('Endereço não encontrado. Ajuste o texto ou clique no mapa.', 'error')
       btn.disabled = false
@@ -312,6 +316,7 @@ document.getElementById('form-cto').onsubmit = async (e) => {
 
   const { error } = await sb.from(TABLE).insert({
     endereco:  endereco,
+    bairro:    bairro,
     area_cabo: document.getElementById('f-area-cabo').value.trim(),
     sp:        document.getElementById('f-sp').value.trim(),
     sec:       document.getElementById('f-sec').value.trim(),
@@ -350,6 +355,7 @@ window.focusMarker = (id) => {
 // ── Modal ─────────────────────────────────────────────────────
 function openModal() {
   document.getElementById('f-endereco').value  = ''
+  document.getElementById('f-bairro').value    = ''
   document.getElementById('f-area-cabo').value = ''
   document.getElementById('f-sp').value        = ''
   document.getElementById('f-sec').value       = ''
@@ -373,8 +379,8 @@ function buildPopupHTML(row) {
   const opts = ['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida']
     .map((s) => `<option ${s === row.status ? 'selected' : ''}>${s}</option>`)
     .join('')
-  const endereco = row.endereco
-    ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml(row.endereco)}</div>` : ''
+  const endereco = row.endereco || row.bairro
+    ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml([row.endereco, row.bairro].filter(Boolean).join(' — '))}</div>` : ''
   const areaCabo = row.area_cabo
     ? `<div class="popup-meta"><span class="popup-tag">ÁREA</span> ${escHtml(row.area_cabo)}</div>` : ''
   const sp  = row.sp
@@ -413,7 +419,7 @@ function upsertListItem(row) {
       <span class="dot" style="background:${c}"></span>
       <div class="list-info">
         <strong>${escHtml(row.area_cabo || 'CTO')}</strong>
-        <small>${row.status}${row.endereco ? ' · ' + escHtml(row.endereco) : ''}${row.sp ? ' · SP ' + escHtml(row.sp) : ''}</small>
+        <small>${row.status}${row.bairro ? ' · ' + escHtml(row.bairro) : ''}${row.endereco ? ' · ' + escHtml(row.endereco) : ''}</small>
       </div>
       <span class="list-arrow">›</span>
     </div>`

@@ -87,8 +87,12 @@
       <form id="form-cto">
         <div class="form-group">
           <label>Endereço</label>
+          <input id="f-endereco" type="text" placeholder="Ex: Rua das Flores, 123" maxlength="120" />
+        </div>
+        <div class="form-group">
+          <label>Bairro</label>
           <div class="input-with-btn">
-            <input id="f-endereco" type="text" placeholder="Ex: Rua das Flores, 123" maxlength="120" />
+            <input id="f-bairro" type="text" placeholder="Ex: Centro" maxlength="80" />
             <button type="button" id="btn-geocode" title="Buscar no mapa">🔍</button>
           </div>
           <div id="geocode-msg" class="geocode-msg"></div>
