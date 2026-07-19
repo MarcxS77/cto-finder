@@ -249,25 +249,29 @@ function makeIcon(status) {
     'Danificada': '#ef4444', 'Desconhecida': '#6b7280',
   }
   const c = colors[status] || '#6b7280'
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
-      <path d="M16 0C7.163 0 0 7.163 0 16c0 10 16 24 16 24s16-14 16-24C32 7.163 24.837 0 16 0z"
-        fill="${c}" stroke="#fff" stroke-width="2"/>
-      <circle cx="16" cy="16" r="7" fill="#fff" opacity="0.9"/>
-      <text x="16" y="20" text-anchor="middle" font-size="10" font-weight="bold" fill="${c}">CTO</text>
-    </svg>`
-  return L.divIcon({ html: svg, className: '', iconSize: [32, 40], iconAnchor: [16, 40], popupAnchor: [0, -40] })
+  const html = `
+    <div style="
+      color:${c};
+      font-size:38px;
+      line-height:1;
+      filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));
+    ">
+      <i class="ph-fill ph-battery-vertical-full"></i>
+    </div>`
+  return L.divIcon({ html, className: '', iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
 }
 
 function makeIconPendente() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
-      <path d="M16 0C7.163 0 0 7.163 0 16c0 10 16 24 16 24s16-14 16-24C32 7.163 24.837 0 16 0z"
-        fill="#f59e0b" stroke="#fff" stroke-width="2"/>
-      <circle cx="16" cy="16" r="7" fill="#fff" opacity="0.9"/>
-      <text x="16" y="20" text-anchor="middle" font-size="9" font-weight="bold" fill="#f59e0b">?</text>
-    </svg>`
-  return L.divIcon({ html: `<div class="marker-pendente">${svg}</div>`, className: '', iconSize: [32, 40], iconAnchor: [16, 40], popupAnchor: [0, -40] })
+  const html = `
+    <div class="marker-pendente" style="
+      color:#f59e0b;
+      font-size:38px;
+      line-height:1;
+      filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));
+    ">
+      <i class="ph-fill ph-battery-vertical-full"></i>
+    </div>`
+  return L.divIcon({ html, className: '', iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
 }
 
 function addMarker(row) {
