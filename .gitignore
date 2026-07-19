@@ -1,0 +1,22 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+
+# Credenciais — NUNCA commitar este arquivo
+.env
+.env.local
+.env.*.local
+
+# Editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
