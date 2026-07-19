@@ -117,6 +117,7 @@ function handleSession(session) {
     if (isAdmin) {
       document.getElementById('btn-pendentes').style.display = 'flex'
       document.getElementById('admin-badge-wrap').style.display = 'block'
+      initAdminPanel()
     }
     if (!mapInitialized) { initMap(); mapInitialized = true }
   } else {
@@ -668,34 +669,40 @@ window.editCto = function (id) {
   document.getElementById('modal-edit').style.display      = 'flex'
 }
 
-document.getElementById('btn-edit-cancelar').onclick = () => {
-  document.getElementById('modal-edit').style.display = 'none'
-}
-document.getElementById('modal-edit-backdrop').onclick = () => {
-  document.getElementById('modal-edit').style.display = 'none'
-}
+function initAdminPanel() {
+  const cancelar  = document.getElementById('btn-edit-cancelar')
+  const backdrop  = document.getElementById('modal-edit-backdrop')
+  const salvar    = document.getElementById('btn-edit-salvar')
+  if (!cancelar || !backdrop || !salvar) return   // index.html antigo — ignora
 
-document.getElementById('btn-edit-salvar').onclick = async () => {
-  const id  = document.getElementById('edit-id').value
-  const btn = document.getElementById('btn-edit-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando…'
-  const { error } = await sb.from(TABLE).update({
-    endereco:         document.getElementById('edit-endereco').value.trim(),
-    numero:           document.getElementById('edit-numero').value.trim(),
-    bairro:           document.getElementById('edit-bairro').value.trim(),
-    area_cabo:        document.getElementById('edit-area-cabo').value.trim(),
-    sp:               document.getElementById('edit-sp').value.trim(),
-    sec:              document.getElementById('edit-sec').value.trim(),
-    status:           document.getElementById('edit-status').value,
-    status_aprovacao: document.getElementById('edit-status-aprovacao').value,
-  }).eq('id', id)
-  btn.disabled = false; btn.textContent = 'Salvar'
-  if (error) {
-    const msg = document.getElementById('edit-msg')
-    msg.textContent = 'Erro: ' + error.message
-    msg.className   = 'geocode-msg error'
-  } else {
+  cancelar.onclick = () => {
     document.getElementById('modal-edit').style.display = 'none'
+  }
+  backdrop.onclick = () => {
+    document.getElementById('modal-edit').style.display = 'none'
+  }
+  salvar.onclick = async () => {
+    const id  = document.getElementById('edit-id').value
+    const btn = salvar
+    btn.disabled = true; btn.textContent = 'Salvando…'
+    const { error } = await sb.from(TABLE).update({
+      endereco:         document.getElementById('edit-endereco').value.trim(),
+      numero:           document.getElementById('edit-numero').value.trim(),
+      bairro:           document.getElementById('edit-bairro').value.trim(),
+      area_cabo:        document.getElementById('edit-area-cabo').value.trim(),
+      sp:               document.getElementById('edit-sp').value.trim(),
+      sec:              document.getElementById('edit-sec').value.trim(),
+      status:           document.getElementById('edit-status').value,
+      status_aprovacao: document.getElementById('edit-status-aprovacao').value,
+    }).eq('id', id)
+    btn.disabled = false; btn.textContent = 'Salvar'
+    if (error) {
+      const msg = document.getElementById('edit-msg')
+      msg.textContent = 'Erro: ' + error.message
+      msg.className   = 'geocode-msg error'
+    } else {
+      document.getElementById('modal-edit').style.display = 'none'
+    }
   }
 }
 
