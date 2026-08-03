@@ -325,16 +325,24 @@ function hideAutocomplete() {
   if (list) { list.innerHTML = ''; list.style.display = 'none' }
 }
 
-function showAutocomplete(results) {
+function parseMapboxFeature(f) {
+  const ctx    = f.context || []
+  const parts  = f.place_name.split(',')
+  const rua    = parts[0].trim()
+  const bCtx   = ctx.find(c => c.id.startsWith('neighborhood') || c.id.startsWith('locality'))
+  const cCtx   = ctx.find(c => c.id.startsWith('place'))
+  const bairro = bCtx ? bCtx.text : (parts[1] ? parts[1].trim() : '')
+  const cidade = cCtx ? cCtx.text : ''
+  return { rua, bairro, cidade, lat: f.center[1], lng: f.center[0] }
+}
+
+function showAutocomplete(features) {
   const list = document.getElementById('autocomplete-list')
   list.innerHTML = ''
-  if (!results.length) { list.style.display = 'none'; return }
-  results.forEach((r) => {
-    const addr   = r.address || {}
-    const bairro = addr.suburb || addr.neighbourhood || addr.city_district || addr.quarter || ''
-    const rua    = addr.road || addr.pedestrian || addr.path || r.display_name.split(',')[0]
-    const cidade = addr.city || addr.town || addr.village || ''
-    const item   = document.createElement('div')
+  if (!features.length) { list.style.display = 'none'; return }
+  features.forEach((f) => {
+    const { rua, bairro, cidade, lat, lng } = parseMapboxFeature(f)
+    const item = document.createElement('div')
     item.className = 'autocomplete-item'
     item.innerHTML = `
       <div class="ac-rua">${escHtml(rua)}</div>
@@ -343,8 +351,7 @@ function showAutocomplete(results) {
       e.preventDefault()
       document.getElementById('f-endereco').value = rua
       document.getElementById('f-bairro').value   = bairro
-      // Centra o mapa na rua; número refinará depois ao salvar
-      pendingLatLng = L.latLng(parseFloat(r.lat), parseFloat(r.lon))
+      pendingLatLng = L.latLng(lat, lng)
       placeTempMarker(pendingLatLng)
       map.flyTo(pendingLatLng, 17)
       hideAutocomplete()
@@ -364,17 +371,45 @@ document.getElementById('f-endereco').addEventListener('input', () => {
   acTimer = setTimeout(async () => {
     try {
       const bairroHint = document.getElementById('f-bairro').value.trim()
-      const query = [val, bairroHint].filter(Boolean).join(', ')
-      const url   = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&countrycodes=br&addressdetails=1`
-      const res   = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
-      const data  = await res.json()
-      showAutocomplete(data)
+      const query = [val, bairroHint, 'Brasil'].filter(Boolean).join(', ')
+      if (MAPBOX_TOKEN) {
+        const url  = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&autocomplete=true&limit=6`
+        const res  = await fetch(url)
+        const data = await res.json()
+        showAutocomplete(data.features || [])
+      } else {
+        // fallback Nominatim
+        const url  = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&countrycodes=br&addressdetails=1`
+        const res  = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } })
+        const rows = await res.json()
+        // adapta para formato esperado por showAutocomplete via Mapbox shape
+        const features = rows.map(r => ({
+          place_name: r.display_name,
+          center: [parseFloat(r.lon), parseFloat(r.lat)],
+          context: [],
+        }))
+        showAutocomplete(features)
+      }
     } catch (_) {}
   }, 400)
 })
 document.getElementById('f-endereco').addEventListener('blur', () => setTimeout(hideAutocomplete, 150))
 
 async function geocodeAddress(endereco, numero, bairro) {
+  if (MAPBOX_TOKEN) {
+    try {
+      // Mapbox interpola numeração com precisão
+      const query = [numero ? `${numero} ${endereco}` : endereco, bairro, 'Brasil'].filter(Boolean).join(', ')
+      const url   = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&limit=1`
+      const res   = await fetch(url)
+      const data  = await res.json()
+      if (data.features && data.features.length > 0) {
+        const [lng, lat] = data.features[0].center
+        return { lat, lng }
+      }
+    } catch (_) {}
+  }
+  // Fallback Nominatim
   try {
     const endComNumero = [endereco, numero].filter(Boolean).join(', ')
     const query = [endComNumero, bairro].filter(Boolean).join(', ')
