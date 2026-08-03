@@ -548,8 +548,6 @@ document.getElementById('modal-backdrop').onclick = closeModal
 // ── Popups ────────────────────────────────────────────────────
 function buildPopupHTML(row) {
   const dt   = row.criado ? new Date(row.criado).toLocaleString('pt-BR') : '—'
-  const opts = ['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida']
-    .map((s) => `<option ${s === row.status ? 'selected' : ''}>${s}</option>`).join('')
   const endFull = [row.endereco, row.numero].filter(Boolean).join(', ')
   const enderecoHtml = endFull || row.bairro
     ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml([endFull, row.bairro].filter(Boolean).join(' — '))}</div>` : ''
@@ -557,18 +555,35 @@ function buildPopupHTML(row) {
     ? `<div class="popup-meta"><span class="popup-tag">ÁREA</span> ${escHtml(row.area_cabo)}</div>` : ''
   const spHtml  = row.sp  ? `<div class="popup-meta"><span class="popup-tag">SP</span> ${escHtml(row.sp)}</div>` : ''
   const secHtml = row.sec ? `<div class="popup-meta"><span class="popup-tag">SEC</span> ${escHtml(row.sec)}</div>` : ''
-  const deleteBtn = isAdmin ? `<button class="popup-del" onclick="deleteCto('${row.id}')">🗑 Remover</button>` : ''
+
+  const statusRow = isAdmin
+    ? (() => {
+        const opts = ['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida']
+          .map((s) => `<option ${s === row.status ? 'selected' : ''}>${s}</option>`).join('')
+        return `<div class="popup-row">
+          <label>Status:</label>
+          <select onchange="changeStatus('${row.id}', this.value)">${opts}</select>
+        </div>`
+      })()
+    : `<div class="popup-row">
+        <label>Status:</label>
+        <span class="popup-status-badge">${escHtml(row.status)}</span>
+      </div>`
+
+  const adminBtns = isAdmin
+    ? `<div class="popup-admin-btns">
+        <button class="popup-edit" onclick="editCto('${row.id}')">✏️ Editar</button>
+        <button class="popup-del"  onclick="deleteCto('${row.id}')">🗑 Remover</button>
+      </div>` : ''
+
   return `
     <div class="popup">
       <div class="popup-nome">${escHtml(row.area_cabo || 'CTO')}</div>
       ${enderecoHtml}${areaCaboHtml}${spHtml}${secHtml}
-      <div class="popup-row">
-        <label>Status:</label>
-        <select onchange="changeStatus('${row.id}', this.value)">${opts}</select>
-      </div>
+      ${statusRow}
       <div class="popup-coords">${row.lat.toFixed(6)}, ${row.lng.toFixed(6)}</div>
       <div class="popup-date">${dt}</div>
-      ${deleteBtn}
+      ${adminBtns}
     </div>`
 }
 

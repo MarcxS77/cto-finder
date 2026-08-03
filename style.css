@@ -803,8 +803,34 @@ body {
   color: #475569;
   margin-bottom: 10px;
 }
+.popup-status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #86efac;
+  background: rgba(13, 42, 18, 0.8);
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #1a3a20;
+}
+
+.popup-admin-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.popup-edit {
+  flex: 1;
+  padding: 7px;
+  border: 1px solid #0d2a12;
+  border-radius: 8px;
+  background: #0d1a0e;
+  color: #86efac;
+  font-size: 13px;
+  cursor: pointer;
+}
+.popup-edit:hover { background: #0d2a12; }
 .popup-del {
-  width: 100%;
+  flex: 1;
   padding: 7px;
   border: 1px solid #7f1d1d;
   border-radius: 8px;
