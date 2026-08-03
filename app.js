@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_KEY
+const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_TOKEN
 const ADMIN_EMAILS  = ['marcos.pbeng@gmail.com']
 const TABLE         = 'ctos'
 const credenciaisOk = !!SUPABASE_URL && !!SUPABASE_KEY
@@ -148,9 +149,17 @@ let map, markers = {}, pendingLatLng = null, tempMarker = null, ctoData = {}
 
 function initMap() {
   map = L.map('map', { zoomControl: false }).setView([-23.55, -46.63], 14)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 20,
+  const tileUrl = MAPBOX_TOKEN
+    ? `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+
+  L.tileLayer(tileUrl, {
+    attribution: MAPBOX_TOKEN
+      ? '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+      : '© OpenStreetMap contributors',
+    tileSize:   MAPBOX_TOKEN ? 512 : 256,
+    zoomOffset: MAPBOX_TOKEN ? -1  : 0,
+    maxZoom: 22,
   }).addTo(map)
   L.control.zoom({ position: 'bottomright' }).addTo(map)
 
