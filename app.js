@@ -576,6 +576,8 @@ function buildPopupHTML(row) {
         <button class="popup-del"  onclick="deleteCto('${row.id}')">🗑 Remover</button>
       </div>` : ''
 
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${row.lat},${row.lng}`
+
   return `
     <div class="popup">
       <div class="popup-nome">${escHtml(row.area_cabo || 'CTO')}</div>
@@ -583,6 +585,10 @@ function buildPopupHTML(row) {
       ${statusRow}
       <div class="popup-coords">${row.lat.toFixed(6)}, ${row.lng.toFixed(6)}</div>
       <div class="popup-date">${dt}</div>
+      <a class="popup-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Abrir rota no Google Maps
+      </a>
       ${adminBtns}
     </div>`
 }
@@ -594,12 +600,18 @@ function buildPopupPendenteHTML(row) {
   const areaCaboHtml = row.area_cabo ? `<div class="popup-meta"><span class="popup-tag">ÁREA</span> ${escHtml(row.area_cabo)}</div>` : ''
   const spHtml  = row.sp  ? `<div class="popup-meta"><span class="popup-tag">SP</span> ${escHtml(row.sp)}</div>` : ''
   const secHtml = row.sec ? `<div class="popup-meta"><span class="popup-tag">SEC</span> ${escHtml(row.sec)}</div>` : ''
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${row.lat},${row.lng}`
+
   return `
     <div class="popup">
       <div class="popup-pendente-tag">⏳ Aguardando aprovação</div>
       <div class="popup-nome">${escHtml(row.area_cabo || 'CTO')}</div>
       ${enderecoHtml}${areaCaboHtml}${spHtml}${secHtml}
       <div class="popup-meta" style="color:#94a3b8;font-size:11px">Por: ${escHtml(row.submetido_por || '—')}</div>
+      <a class="popup-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Abrir rota no Google Maps
+      </a>
       <div class="popup-actions-admin">
         <button class="btn-aprovar" onclick="aprovarCto('${row.id}')">✓ Aprovar</button>
         <button class="btn-rejeitar" onclick="rejeitarCto('${row.id}')">✕ Rejeitar</button>
