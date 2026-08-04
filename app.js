@@ -9,6 +9,10 @@ const ADMIN_EMAILS  = ['marcos.pbeng@gmail.com']
 const TABLE         = 'ctos'
 const credenciaisOk = !!SUPABASE_URL && !!SUPABASE_KEY
 
+// Detecta redirect OAuth ANTES do createClient limpar a URL
+const isOAuthRedirect = window.location.hash.includes('access_token') ||
+                        window.location.search.includes('code=')
+
 let sb = null
 if (credenciaisOk) {
   try {
@@ -102,10 +106,6 @@ document.getElementById('auth-senha').addEventListener('keydown', (e) => {
 })
 
 if (!credenciaisOk) showAuthMsg('⚠️ Configure as variáveis de ambiente no arquivo .env.', 'error')
-
-// Detecta se há tokens OAuth na URL (implicit flow retorna no hash)
-const isOAuthRedirect = window.location.hash.includes('access_token') ||
-                        window.location.search.includes('code=')
 
 function handleSession(session) {
   if (session) {
