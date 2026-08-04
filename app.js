@@ -127,7 +127,13 @@ function handleSession(session) {
       document.getElementById('admin-badge-wrap').style.display = 'block'
       initAdminPanel()
     }
-    if (!mapInitialized) { initMap(); initSearch(); mapInitialized = true }
+    if (!mapInitialized) {
+      initMap()
+      initSearch()
+      makeDraggable(document.getElementById('painel'),       true)
+      makeDraggable(document.getElementById('painel-admin'), false)
+      mapInitialized = true
+    }
   } else {
     currentUser = null
     isAdmin     = false
@@ -224,6 +230,93 @@ function initSearch() {
       results.appendChild(li)
     })
   })
+}
+
+// ══════════════════════════════════════
+//  SWIPE PARA ABRIR/FECHAR PAINÉIS
+// ══════════════════════════════════════
+function makeDraggable(panelEl, fromLeft) {
+  // fromLeft=true → painel vem da esquerda (#painel)
+  // fromLeft=false → painel vem da direita (#painel-admin)
+  const EDGE_ZONE  = 32   // px da borda da tela para iniciar arraste quando fechado
+  const SNAP_RATIO = 0.35 // fração da largura para "snap" abrir/fechar
+
+  let startX = 0, startY = 0, panelW = 0, tracking = false, moved = false
+
+  function baseOffset() {
+    // offset inicial em px conforme estado atual
+    const open = panelEl.classList.contains('open')
+    if (fromLeft)  return open ? 0 : -panelW
+    else           return open ? 0 :  panelW
+  }
+
+  function setX(px) {
+    panelEl.style.transition = 'none'
+    panelEl.style.transform  = `translateX(${px}px)`
+  }
+
+  function commit(open) {
+    panelEl.style.transition = ''
+    panelEl.style.transform  = ''
+    panelEl.classList.toggle('open', open)
+  }
+
+  document.addEventListener('touchstart', (e) => {
+    panelW   = panelEl.offsetWidth
+    startX   = e.touches[0].clientX
+    startY   = e.touches[0].clientY
+    tracking = false
+    moved    = false
+
+    const open = panelEl.classList.contains('open')
+    if (fromLeft) {
+      if (open  && startX < panelW + 10)               tracking = true
+      if (!open && startX < EDGE_ZONE)                 tracking = true
+    } else {
+      if (open  && startX > window.innerWidth - panelW - 10) tracking = true
+      if (!open && startX > window.innerWidth - EDGE_ZONE)   tracking = true
+    }
+  }, { passive: true })
+
+  document.addEventListener('touchmove', (e) => {
+    if (!tracking) return
+    const dx = e.touches[0].clientX - startX
+    const dy = e.touches[0].clientY - startY
+
+    if (!moved) {
+      // Cancela se gesto for mais vertical que horizontal
+      if (Math.abs(dy) > Math.abs(dx)) { tracking = false; return }
+      moved = true
+    }
+
+    e.preventDefault()
+    const base    = baseOffset()
+    const raw     = base + dx
+    const clamped = fromLeft
+      ? Math.max(-panelW, Math.min(0, raw))
+      : Math.max(0,       Math.min(panelW, raw))
+    setX(clamped)
+  }, { passive: false })
+
+  document.addEventListener('touchend', (e) => {
+    if (!tracking || !moved) { tracking = false; return }
+    tracking = false
+
+    const dx   = e.changedTouches[0].clientX - startX
+    const open = panelEl.classList.contains('open')
+
+    let shouldOpen
+    if (fromLeft) {
+      shouldOpen = open
+        ? dx > -panelW * SNAP_RATIO   // estava aberto: fecha só se arrastou o suficiente
+        : dx >  panelW * SNAP_RATIO   // estava fechado: abre se arrastou o suficiente
+    } else {
+      shouldOpen = open
+        ? dx <  panelW * SNAP_RATIO
+        : dx < -panelW * SNAP_RATIO
+    }
+    commit(shouldOpen)
+  }, { passive: true })
 }
 
 // ══════════════════════════════════════

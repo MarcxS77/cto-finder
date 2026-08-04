@@ -829,8 +829,21 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  touch-action: pan-y;
 }
 #painel.open { transform: translateX(0); }
+
+/* Drag handle visual — aparece dentro do header */
+.painel-drag-hint {
+  width: 36px;
+  height: 4px;
+  background: rgba(57,255,20,0.25);
+  border-radius: 2px;
+  margin: 8px auto 0;
+}
+
+/* Painel admin — handle no lado oposto */
+#painel-admin { touch-action: pan-y; }
 
 .painel-header {
   background: linear-gradient(135deg, #0d2a12, #061a08);
