@@ -9,8 +9,9 @@ const ADMIN_EMAILS  = ['marcos.pbeng@gmail.com']
 const TABLE         = 'ctos'
 const credenciaisOk = !!SUPABASE_URL && !!SUPABASE_KEY
 
-// Detecta redirect OAuth ANTES do createClient limpar a URL
-const isOAuthRedirect = window.location.hash.includes('access_token') ||
+// Detecta redirect OAuth via sessionStorage (mais confiável que URL parsing)
+const isOAuthRedirect = !!sessionStorage.getItem('oauth_pending') ||
+                        window.location.hash.includes('access_token') ||
                         window.location.search.includes('code=')
 
 let sb = null
@@ -72,11 +73,16 @@ function showUserInfo(user) {
 
 document.getElementById('btn-google-login').onclick = async () => {
   if (!sb) return showAuthMsg('Credenciais do Supabase não configuradas.', 'error')
+  // Marca que um redirect OAuth vai acontecer (lido de volta ao retornar)
+  sessionStorage.setItem('oauth_pending', '1')
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href },
+    options: { redirectTo: window.location.origin },
   })
-  if (error) showAuthMsg(error.message, 'error')
+  if (error) {
+    sessionStorage.removeItem('oauth_pending')
+    showAuthMsg(error.message, 'error')
+  }
 }
 
 document.getElementById('btn-auth-submit').onclick = async () => {
@@ -109,6 +115,7 @@ if (!credenciaisOk) showAuthMsg('⚠️ Configure as variáveis de ambiente no a
 
 function handleSession(session) {
   if (session) {
+    sessionStorage.removeItem('oauth_pending')
     currentUser = session.user
     isAdmin     = ADMIN_EMAILS.includes(currentUser.email)
     document.getElementById('loading-screen').style.display = 'none'
@@ -140,15 +147,16 @@ if (sb) {
   })
 }
 
-// Fallback: se OAuth travar por mais de 8s, mostra tela de login
+// Fallback: se OAuth travar por mais de 10s, desiste e mostra login
 if (isOAuthRedirect) {
   setTimeout(() => {
     const loading = document.getElementById('loading-screen')
     if (loading && loading.style.display !== 'none') {
+      sessionStorage.removeItem('oauth_pending')
       loading.style.display = 'none'
       document.getElementById('login-screen').style.display = 'flex'
     }
-  }, 8000)
+  }, 10000)
 }
 
 document.getElementById('btn-logout').onclick = () => { if (sb) sb.auth.signOut() }
