@@ -232,6 +232,112 @@ body {
 }
 #topbar .logo span { color: #39ff14; text-shadow: 0 0 10px rgba(57,255,20,0.7); }
 
+.btn-search-toggle {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: background 0.15s;
+  line-height: 1;
+}
+.btn-search-toggle:hover { background: rgba(57,255,20,0.1); }
+
+/* ── Search Panel ── */
+#search-panel {
+  display: none;
+  position: fixed;
+  top: 52px;
+  left: 0; right: 0;
+  z-index: 890;
+  background: rgba(13, 26, 14, 0.97);
+  border-bottom: 1px solid #0d2a12;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  max-height: 70dvh;
+  overflow: hidden;
+  flex-direction: column;
+}
+#search-panel.open { display: flex; }
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #0d2a12;
+}
+.search-icon { font-size: 16px; opacity: 0.6; flex-shrink: 0; }
+#search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: #f1f5f9;
+  font-size: 15px;
+}
+#search-input::placeholder { color: #4b5563; }
+#btn-search-close {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+#btn-search-close:hover { color: #f1f5f9; }
+
+#search-results {
+  list-style: none;
+  overflow-y: auto;
+  max-height: calc(70dvh - 52px);
+}
+#search-results li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(13,42,18,0.5);
+  transition: background 0.12s;
+}
+#search-results li:hover { background: rgba(57,255,20,0.06); }
+.sr-icon { font-size: 20px; flex-shrink: 0; }
+.sr-info { flex: 1; min-width: 0; }
+.sr-endereco {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sr-meta {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+.sr-status {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.sr-status.ativa      { background:#14532d; color:#86efac; }
+.sr-status.manutencao { background:#451a03; color:#fcd34d; }
+.sr-status.danificada { background:#450a0a; color:#fca5a5; }
+.sr-status.desconhecida{ background:#1f2937; color:#9ca3af; }
+
+#search-empty {
+  padding: 24px;
+  text-align: center;
+  color: #4b5563;
+  font-size: 14px;
+}
+
 .badge {
   font-size: 11px;
   background: #166534;

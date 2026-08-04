@@ -127,7 +127,7 @@ function handleSession(session) {
       document.getElementById('admin-badge-wrap').style.display = 'block'
       initAdminPanel()
     }
-    if (!mapInitialized) { initMap(); mapInitialized = true }
+    if (!mapInitialized) { initMap(); initSearch(); mapInitialized = true }
   } else {
     currentUser = null
     isAdmin     = false
@@ -160,6 +160,71 @@ if (isOAuthRedirect) {
 }
 
 document.getElementById('btn-logout').onclick = () => { if (sb) sb.auth.signOut() }
+
+// ══════════════════════════════════════
+//  BUSCA
+// ══════════════════════════════════════
+function initSearch() {
+  const panel    = document.getElementById('search-panel')
+  const input    = document.getElementById('search-input')
+  const results  = document.getElementById('search-results')
+  const empty    = document.getElementById('search-empty')
+  const btnOpen  = document.getElementById('btn-search-toggle')
+  const btnClose = document.getElementById('btn-search-close')
+
+  btnOpen.onclick = () => {
+    panel.classList.toggle('open')
+    if (panel.classList.contains('open')) {
+      input.value = ''
+      results.innerHTML = ''
+      empty.style.display = 'none'
+      setTimeout(() => input.focus(), 50)
+    }
+  }
+
+  btnClose.onclick = () => {
+    panel.classList.remove('open')
+    input.value = ''
+    results.innerHTML = ''
+    empty.style.display = 'none'
+  }
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase()
+    results.innerHTML = ''
+    empty.style.display = 'none'
+    if (!q) return
+
+    const matches = Object.values(ctoData).filter(row => {
+      return [row.endereco, row.bairro, row.area_cabo, row.sp, row.sec, row.status]
+        .some(v => v && v.toString().toLowerCase().includes(q))
+    })
+
+    if (!matches.length) { empty.style.display = 'block'; return }
+
+    const statusClass = { 'Ativa': 'ativa', 'Em manutenção': 'manutencao', 'Danificada': 'danificada', 'Desconhecida': 'desconhecida' }
+    matches.slice(0, 30).forEach(row => {
+      const li = document.createElement('li')
+      const cls = statusClass[row.status] || 'desconhecida'
+      const addr = [row.numero ? `Nº ${row.numero}` : '', row.endereco].filter(Boolean).join(' ')
+      li.innerHTML = `
+        <span class="sr-icon"><i class="ph-fill ph-battery-vertical-full" style="color:#39ff14"></i></span>
+        <div class="sr-info">
+          <div class="sr-endereco">${escHtml(addr || '—')}</div>
+          <div class="sr-meta">${escHtml(row.bairro || '')}${row.area_cabo ? ' · ' + escHtml(row.area_cabo) : ''}${row.sp ? ' · SP ' + escHtml(row.sp) : ''}</div>
+        </div>
+        <span class="sr-status ${cls}">${escHtml(row.status)}</span>`
+      li.onclick = () => {
+        panel.classList.remove('open')
+        input.value = ''
+        results.innerHTML = ''
+        map.flyTo([row.lat, row.lng], 19, { duration: 1 })
+        setTimeout(() => { if (markers[row.id]) markers[row.id].openPopup() }, 1100)
+      }
+      results.appendChild(li)
+    })
+  })
+}
 
 // ══════════════════════════════════════
 //  MAPA
