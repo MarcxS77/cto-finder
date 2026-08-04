@@ -234,6 +234,7 @@ async function loadCtos() {
         removeListItem(row.id)
         removePendenteItem(row.id)
         removeTodasItem(row.id)
+        removeAtividadeItem(row.id)
         if (row.status_aprovacao === 'aprovado') {
           addMarker(row)
         } else if (isAdmin && row.status_aprovacao === 'pendente') {
@@ -245,6 +246,7 @@ async function loadCtos() {
         removeListItem(row.id)
         removePendenteItem(row.id)
         removeTodasItem(row.id)
+        removeAtividadeItem(row.id)
         updatePendenteCount()
       }
     })
@@ -289,7 +291,7 @@ function addMarker(row) {
     .addTo(map).bindPopup(buildPopupHTML(row))
   markers[row.id] = m
   upsertListItem(row)
-  if (isAdmin) upsertTodasItem(row)
+  if (isAdmin) { upsertTodasItem(row); upsertAtividadeItem(row) }
 }
 
 function addMarkerPendente(row) {
@@ -298,7 +300,7 @@ function addMarkerPendente(row) {
     .addTo(map).bindPopup(buildPopupPendenteHTML(row))
   markers[row.id] = m
   upsertPendenteItem(row)
-  if (isAdmin) upsertTodasItem(row)
+  if (isAdmin) { upsertTodasItem(row); upsertAtividadeItem(row) }
 }
 
 function removeMarker(id) {
@@ -687,6 +689,7 @@ function updatePendenteCount() {
 window.switchAdminTab = function (tab) {
   document.getElementById('lista-pendentes').style.display = tab === 'pendentes' ? 'block' : 'none'
   document.getElementById('lista-todas').style.display     = tab === 'todas'     ? 'block' : 'none'
+  document.getElementById('lista-atividade').style.display = tab === 'atividade' ? 'block' : 'none'
   document.querySelectorAll('.admin-tab').forEach((t) =>
     t.classList.toggle('active', t.dataset.tab === tab)
   )
@@ -723,6 +726,43 @@ function upsertTodasItem(row) {
 
 function removeTodasItem(id) {
   const li = document.getElementById('tai-' + id)
+  if (li) li.remove()
+}
+
+// ── Lista de Inserções (admin) ────────────────────────────────
+function upsertAtividadeItem(row) {
+  let li = document.getElementById('ati-' + row.id)
+  if (!li) {
+    li = document.createElement('li')
+    li.id = 'ati-' + row.id
+    li.dataset.criado = row.criado || ''
+    // Insere na posição correta (mais recente no topo)
+    const lista = document.getElementById('lista-atividade')
+    const items = Array.from(lista.children)
+    const after = items.find(el => (el.dataset.criado || '') < (row.criado || ''))
+    lista.insertBefore(li, after || null)
+  }
+  const dt      = row.criado ? new Date(row.criado).toLocaleString('pt-BR') : '—'
+  const usuario = row.submetido_por || 'Desconhecido'
+  const inicial = usuario[0].toUpperCase()
+  const isPend  = row.status_aprovacao === 'pendente'
+  const badgeCls = isPend ? 'ativ-badge pendente' : 'ativ-badge aprovado'
+  const badgeTxt = isPend ? '⏳ Pendente' : '✓ Aprovado'
+
+  li.innerHTML = `
+    <div class="ativ-item" onclick="focusMarker('${row.id}');switchAdminTab('atividade')">
+      <div class="ativ-avatar">${escHtml(inicial)}</div>
+      <div class="ativ-info">
+        <strong>${escHtml(row.area_cabo || 'CTO')}</strong>
+        <small>${escHtml(usuario)}</small>
+        <small class="ativ-date">🕒 ${dt}</small>
+      </div>
+      <span class="${badgeCls}">${badgeTxt}</span>
+    </div>`
+}
+
+function removeAtividadeItem(id) {
+  const li = document.getElementById('ati-' + id)
   if (li) li.remove()
 }
 

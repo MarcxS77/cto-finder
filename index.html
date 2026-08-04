@@ -50,7 +50,7 @@
       <div class="auth-msg" id="auth-msg"></div>
     </div>
 
-    <p class="login-footer">Desenvolvido por Marcos Vinicius ©</p>
+    <p class="login-footer">Desenvolvido por Marcos Vinicius</p>
   </div>
 </div>
 
@@ -169,11 +169,15 @@
         ⏳ Pendentes <span id="pendentes-tab-count" class="admin-tab-badge">0</span>
       </button>
       <button class="admin-tab" data-tab="todas" onclick="switchAdminTab('todas')">
-        📋 Todas as CTOs
+        📋 Todas
+      </button>
+      <button class="admin-tab" data-tab="atividade" onclick="switchAdminTab('atividade')">
+        👥 Inserções
       </button>
     </div>
     <ul id="lista-pendentes" class="admin-list"></ul>
     <ul id="lista-todas"     class="admin-list" style="display:none"></ul>
+    <ul id="lista-atividade" class="admin-list" style="display:none"></ul>
   </div>
 
   <!-- Modal de edição (admin) -->

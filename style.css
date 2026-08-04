@@ -587,6 +587,65 @@ body {
   vertical-align: middle;
 }
 
+/* Lista de Inserções */
+.ativ-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid #060f07;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ativ-item:hover { background: #060f07; }
+.ativ-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #0d2a12;
+  border: 1px solid #1a3a20;
+  color: #39ff14;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ativ-info {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ativ-info strong {
+  font-size: 13px;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ativ-info small {
+  font-size: 11px;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ativ-date { color: #3a5440 !important; }
+.ativ-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ativ-badge.aprovado { background: #0d2a12; color: #39ff14; }
+.ativ-badge.pendente { background: #78350f; color: #fcd34d; }
+
 /* Modal de edição */
 #modal-edit {
   display: none;
