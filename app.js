@@ -381,12 +381,66 @@ function initMap() {
     document.getElementById('painel-admin').classList.remove('open')
 }
 
+// ── Alertas ──────────────────────────────────────────────────
+let alertasCount = {}  // cto_id → número de alertas
+let myAlertas    = new Set()  // cto_ids que o usuário atual reportou
+
+async function loadAlertas() {
+  const { data } = await sb.from('alertas').select('cto_id, user_id')
+  if (!data) return
+  alertasCount = {}
+  myAlertas    = new Set()
+  data.forEach(a => {
+    alertasCount[a.cto_id] = (alertasCount[a.cto_id] || 0) + 1
+    if (a.user_id === currentUser.id) myAlertas.add(a.cto_id)
+  })
+}
+
+window.reportarAlerta = async (ctoId) => {
+  const jaReportou = myAlertas.has(ctoId)
+  if (jaReportou) {
+    await sb.from('alertas').delete().eq('cto_id', ctoId).eq('user_id', currentUser.id)
+    myAlertas.delete(ctoId)
+    alertasCount[ctoId] = Math.max(0, (alertasCount[ctoId] || 1) - 1)
+  } else {
+    await sb.from('alertas').insert({ cto_id: ctoId, user_id: currentUser.id })
+    myAlertas.add(ctoId)
+    alertasCount[ctoId] = (alertasCount[ctoId] || 0) + 1
+  }
+  // Atualiza popup aberto sem recarregar o mapa
+  if (markers[ctoId]) {
+    markers[ctoId].setPopupContent(buildPopupHTML(ctoData[ctoId]))
+    markers[ctoId].openPopup()
+  }
+  // Atualiza ícone se tem alertas
+  refreshMarkerIcon(ctoId)
+}
+
+window.dispensarAlertas = async (ctoId) => {
+  await sb.from('alertas').delete().eq('cto_id', ctoId)
+  alertasCount[ctoId] = 0
+  myAlertas.delete(ctoId)
+  if (markers[ctoId]) {
+    markers[ctoId].setPopupContent(buildPopupHTML(ctoData[ctoId]))
+  }
+  refreshMarkerIcon(ctoId)
+}
+
+function refreshMarkerIcon(ctoId) {
+  if (!markers[ctoId] || !ctoData[ctoId]) return
+  const row  = ctoData[ctoId]
+  const icon = (alertasCount[ctoId] || 0) > 0 ? makeIconAlerta(row.status) : makeIcon(row.status)
+  markers[ctoId].setIcon(icon)
+}
+
 async function loadCtos() {
   // Admin vê tudo; usuários comuns veem só aprovadas
   let query = sb.from(TABLE).select('*')
   if (!isAdmin) query = query.eq('status_aprovacao', 'aprovado')
   const { data, error } = await query
   if (error) { console.error(error.message); return }
+
+  await loadAlertas()
 
   data.forEach((row) => {
     if (row.status_aprovacao === 'aprovado') addMarker(row)
@@ -449,6 +503,22 @@ function makeIcon(status) {
   return L.divIcon({ html, className: '', iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
 }
 
+function makeIconAlerta(status) {
+  const colors = {
+    'Ativa': '#22c55e', 'Em manutenção': '#f59e0b',
+    'Danificada': '#ef4444', 'Desconhecida': '#6b7280',
+  }
+  const c = colors[status] || '#6b7280'
+  const html = `
+    <div style="position:relative;display:inline-block;">
+      <div style="color:${c};font-size:38px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));">
+        <i class="ph-fill ph-battery-vertical-full"></i>
+      </div>
+      <div style="position:absolute;top:-4px;right:-6px;background:#f97316;color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;line-height:1;">!</div>
+    </div>`
+  return L.divIcon({ html, className: '', iconSize: [44, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
+}
+
 function makeIconPendente() {
   const html = `
     <div class="marker-pendente" style="
@@ -464,7 +534,8 @@ function makeIconPendente() {
 
 function addMarker(row) {
   ctoData[row.id] = row
-  const m = L.marker([row.lat, row.lng], { icon: makeIcon(row.status) })
+  const icon = (alertasCount[row.id] || 0) > 0 ? makeIconAlerta(row.status) : makeIcon(row.status)
+  const m = L.marker([row.lat, row.lng], { icon })
     .addTo(map).bindPopup(buildPopupHTML(row))
   markers[row.id] = m
   upsertListItem(row)
@@ -755,7 +826,19 @@ function buildPopupHTML(row) {
         <button class="popup-del"  onclick="deleteCto('${row.id}')">🗑 Remover</button>
       </div>` : ''
 
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${row.lat},${row.lng}`
+  const mapsUrl    = `https://www.google.com/maps/dir/?api=1&destination=${row.lat},${row.lng}`
+  const count      = alertasCount[row.id] || 0
+  const jaReportou = myAlertas.has(row.id)
+
+  const alertaBtn = isAdmin
+    ? (count > 0
+        ? `<button class="popup-alerta-dismiss" onclick="dispensarAlertas('${row.id}')">
+             ⚠️ ${count} alerta${count > 1 ? 's' : ''} — Dispensar
+           </button>`
+        : '')
+    : `<button class="popup-alerta-btn ${jaReportou ? 'reportado' : ''}" onclick="reportarAlerta('${row.id}')">
+         ${jaReportou ? '✓ Ausência reportada' : '⚠️ Reportar ausência'}
+       </button>`
 
   return `
     <div class="popup">
@@ -768,6 +851,7 @@ function buildPopupHTML(row) {
         <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         Abrir rota no Google Maps
       </a>
+      ${alertaBtn}
       ${adminBtns}
     </div>`
 }
