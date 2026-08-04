@@ -140,6 +140,17 @@ if (sb) {
   })
 }
 
+// Fallback: se OAuth travar por mais de 8s, mostra tela de login
+if (isOAuthRedirect) {
+  setTimeout(() => {
+    const loading = document.getElementById('loading-screen')
+    if (loading && loading.style.display !== 'none') {
+      loading.style.display = 'none'
+      document.getElementById('login-screen').style.display = 'flex'
+    }
+  }, 8000)
+}
+
 document.getElementById('btn-logout').onclick = () => { if (sb) sb.auth.signOut() }
 
 // ══════════════════════════════════════
@@ -731,13 +742,14 @@ function removeTodasItem(id) {
 
 // ── Lista de Inserções (admin) ────────────────────────────────
 function upsertAtividadeItem(row) {
+  const lista = document.getElementById('lista-atividade')
+  if (!lista) return   // guard: index.html antigo sem o elemento
   let li = document.getElementById('ati-' + row.id)
   if (!li) {
     li = document.createElement('li')
     li.id = 'ati-' + row.id
     li.dataset.criado = row.criado || ''
     // Insere na posição correta (mais recente no topo)
-    const lista = document.getElementById('lista-atividade')
     const items = Array.from(lista.children)
     const after = items.find(el => (el.dataset.criado || '') < (row.criado || ''))
     lista.insertBefore(li, after || null)
