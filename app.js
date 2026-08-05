@@ -5,7 +5,6 @@ import 'leaflet/dist/leaflet.css'
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_KEY
 const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_TOKEN
-const ADMIN_EMAILS  = ['marcos.pbeng@gmail.com']
 const TABLE         = 'ctos'
 const credenciaisOk = !!SUPABASE_URL && !!SUPABASE_KEY
 
@@ -113,11 +112,19 @@ document.getElementById('auth-senha').addEventListener('keydown', (e) => {
 
 if (!credenciaisOk) showAuthMsg('⚠️ Configure as variáveis de ambiente no arquivo .env.', 'error')
 
-function handleSession(session) {
+async function handleSession(session) {
   if (session) {
     sessionStorage.removeItem('oauth_pending')
     currentUser = session.user
-    isAdmin     = ADMIN_EMAILS.includes(currentUser.email)
+
+    // Verifica admin no banco — não no frontend
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', currentUser.id)
+      .single()
+    isAdmin = !!profile?.is_admin
+
     document.getElementById('loading-screen').style.display = 'none'
     document.getElementById('login-screen').style.display = 'none'
     document.getElementById('app').style.display = 'block'
@@ -991,7 +998,7 @@ async function loadUsuarios() {
     const inicial = nome[0].toUpperCase()
     const dt      = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'
     const ctos    = ctoCounts[p.email] || 0
-    const isAdminUser = ADMIN_EMAILS.includes(p.email)
+    const isAdminUser = !!p.is_admin
 
     const card = document.createElement('div')
     card.className = 'usuario-card'
