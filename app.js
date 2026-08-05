@@ -936,41 +936,51 @@ function renderGroupedList() {
     li.className = 'group-li'
     li.id = 'grp-' + CSS.escape(key)
 
-    const children = rows.map(r => {
+    const childEls = rows.map(r => {
       const c    = STATUS_COLORS[r.status] || '#6b7280'
       const info = [r.sp ? 'SP: ' + r.sp : '', r.sec ? 'SEC: ' + r.sec : '', r.status].filter(Boolean).join(' · ')
       const alerta = (alertasCount[r.id] || 0) > 0 ? ' <span class="grp-alerta-dot">!</span>' : ''
-      return `<li class="group-child" onclick="focusMarker('${r.id}')">
+      const addr   = r.endereco ? `<small class="grp-addr">${escHtml([r.numero, r.endereco].filter(Boolean).join(' '))}</small>` : ''
+      const el = document.createElement('li')
+      el.className = 'group-child'
+      el.innerHTML = `
         <span class="dot" style="background:${c};flex-shrink:0"></span>
         <div class="list-info">
           <small>${escHtml(info)}${alerta}</small>
-          ${r.endereco ? `<small class="grp-addr">${escHtml([r.numero, r.endereco].filter(Boolean).join(' '))}</small>` : ''}
+          ${addr}
         </div>
-        <span class="list-arrow">›</span>
-      </li>`
-    }).join('')
+        <span class="list-arrow">›</span>`
+      el.addEventListener('click', () => focusMarker(r.id))
+      return el
+    })
+    const children = childEls
 
-    li.innerHTML = `
-      <div class="group-header" onclick="toggleGroup(${JSON.stringify(key)})">
-        <span class="group-chevron">${isOpen ? '▾' : '▸'}</span>
-        <span class="dot" style="background:${groupColor};flex-shrink:0"></span>
-        <div class="list-info">
-          <strong>${escHtml(key)}${hasAlerta ? ' <span class="grp-alerta-dot">!</span>' : ''}</strong>
-          <small>${rows.length} CTO${rows.length !== 1 ? 's' : ''}</small>
-        </div>
-      </div>
-      <ul class="group-children" style="display:${isOpen ? 'block' : 'none'}">${children}</ul>`
+    const header = document.createElement('div')
+    header.className = 'group-header'
+    header.innerHTML = `
+      <span class="group-chevron">${isOpen ? '▾' : '▸'}</span>
+      <span class="dot" style="background:${groupColor};flex-shrink:0"></span>
+      <div class="list-info">
+        <strong>${escHtml(key)}${hasAlerta ? ' <span class="grp-alerta-dot">!</span>' : ''}</strong>
+        <small>${rows.length} CTO${rows.length !== 1 ? 's' : ''}</small>
+      </div>`
+    header.addEventListener('click', () => {
+      if (openGroups.has(key)) openGroups.delete(key)
+      else openGroups.add(key)
+      renderGroupedList()
+    })
 
+    const ul = document.createElement('ul')
+    ul.className = 'group-children'
+    ul.style.display = isOpen ? 'block' : 'none'
+    children.forEach(el => ul.appendChild(el))
+
+    li.appendChild(header)
+    li.appendChild(ul)
     lista.appendChild(li)
   })
 
   updateCount()
-}
-
-window.toggleGroup = function(key) {
-  if (openGroups.has(key)) openGroups.delete(key)
-  else openGroups.add(key)
-  renderGroupedList()
 }
 
 function updateCount() {
