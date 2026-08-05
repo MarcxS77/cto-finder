@@ -951,9 +951,55 @@ window.switchAdminTab = function (tab) {
   document.getElementById('lista-pendentes').style.display = tab === 'pendentes' ? 'block' : 'none'
   document.getElementById('lista-todas').style.display     = tab === 'todas'     ? 'block' : 'none'
   document.getElementById('lista-atividade').style.display = tab === 'atividade' ? 'block' : 'none'
+  document.getElementById('lista-usuarios').style.display  = tab === 'usuarios'  ? 'block' : 'none'
   document.querySelectorAll('.admin-tab').forEach((t) =>
     t.classList.toggle('active', t.dataset.tab === tab)
   )
+  if (tab === 'usuarios') loadUsuarios()
+}
+
+async function loadUsuarios() {
+  const container = document.getElementById('lista-usuarios')
+  container.innerHTML = '<div class="usuarios-loading">Carregando…</div>'
+
+  const { data: perfis, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false })
+  if (error) { container.innerHTML = '<div class="usuarios-loading">Erro ao carregar.</div>'; return }
+
+  // Conta CTOs por usuário (pelo email em submetido_por)
+  const ctoCounts = {}
+  Object.values(ctoData).forEach(row => {
+    if (row.submetido_por) ctoCounts[row.submetido_por] = (ctoCounts[row.submetido_por] || 0) + 1
+  })
+
+  container.innerHTML = ''
+
+  if (!perfis.length) {
+    container.innerHTML = '<div class="usuarios-loading">Nenhum usuário encontrado.</div>'
+    return
+  }
+
+  perfis.forEach(p => {
+    const nome    = p.full_name || p.email || 'Sem nome'
+    const inicial = nome[0].toUpperCase()
+    const dt      = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'
+    const ctos    = ctoCounts[p.email] || 0
+    const isAdminUser = ADMIN_EMAILS.includes(p.email)
+
+    const card = document.createElement('div')
+    card.className = 'usuario-card'
+    card.innerHTML = `
+      <div class="usuario-avatar">
+        ${p.avatar_url
+          ? `<img src="${p.avatar_url}" alt="avatar" />`
+          : `<span>${escHtml(inicial)}</span>`}
+      </div>
+      <div class="usuario-info">
+        <div class="usuario-nome">${escHtml(nome)} ${isAdminUser ? '<span class="usuario-admin-badge">admin</span>' : ''}</div>
+        <div class="usuario-email">${escHtml(p.email || '—')}</div>
+        <div class="usuario-meta">📅 ${dt} · 📦 ${ctos} CTO${ctos !== 1 ? 's' : ''}</div>
+      </div>`
+    container.appendChild(card)
+  })
 }
 
 // ── Lista "Todas as CTOs" (admin) ─────────────────────────────
