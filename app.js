@@ -325,7 +325,7 @@ function makeDraggable(panelEl, fromLeft) {
 let map, markers = {}, pendingLatLng = null, tempMarker = null, ctoData = {}
 
 function initMap() {
-  map = L.map('map', { zoomControl: false }).setView([-23.55, -46.63], 14)
+  map = L.map('map', { zoomControl: false }).setView([-23.5886, -46.6097], 15)
   const tileUrl = MAPBOX_TOKEN
     ? `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
     : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -621,9 +621,15 @@ document.getElementById('f-endereco').addEventListener('input', () => {
   acTimer = setTimeout(async () => {
     try {
       const bairroHint = document.getElementById('f-bairro').value.trim()
-      const query = [val, bairroHint, 'Brasil'].filter(Boolean).join(', ')
+      const query = [val, bairroHint].filter(Boolean).join(', ')
       if (MAPBOX_TOKEN) {
-        const url  = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&autocomplete=true&limit=6`
+        const center  = map ? map.getCenter() : { lat: -23.5886, lng: -46.6097 }
+        const prox    = `${center.lng},${center.lat}`
+        const bounds  = map ? map.getBounds() : null
+        const bboxStr = bounds
+          ? `&bbox=${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`
+          : ''
+        const url  = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&autocomplete=true&limit=6&proximity=${prox}${bboxStr}`
         const res  = await fetch(url)
         const data = await res.json()
         showAutocomplete(data.features || [])
@@ -649,8 +655,10 @@ async function geocodeAddress(endereco, numero, bairro) {
   if (MAPBOX_TOKEN) {
     try {
       // Mapbox interpola numeração com precisão
-      const query = [numero ? `${numero} ${endereco}` : endereco, bairro, 'Brasil'].filter(Boolean).join(', ')
-      const url   = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&limit=1`
+      const query  = [numero ? `${numero} ${endereco}` : endereco, bairro].filter(Boolean).join(', ')
+      const center = map ? map.getCenter() : { lat: -23.55, lng: -46.63 }
+      const prox   = `${center.lng},${center.lat}`
+      const url    = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&limit=1&proximity=${prox}`
       const res   = await fetch(url)
       const data  = await res.json()
       if (data.features && data.features.length > 0) {
