@@ -897,32 +897,84 @@ function buildPopupPendenteHTML(row) {
     </div>`
 }
 
-// ── Lista lateral ─────────────────────────────────────────────
-function upsertListItem(row) {
-  let li = document.getElementById('li-' + row.id)
-  if (!li) { li = document.createElement('li'); li.id = 'li-' + row.id; document.getElementById('lista-ctos').appendChild(li) }
-  const colors = { 'Ativa': '#22c55e', 'Em manutenção': '#f59e0b', 'Danificada': '#ef4444', 'Desconhecida': '#6b7280' }
-  const c = colors[row.status] || '#6b7280'
-  li.innerHTML = `
-    <div class="list-item" onclick="focusMarker('${row.id}')">
-      <span class="dot" style="background:${c}"></span>
-      <div class="list-info">
-        <strong>${escHtml(row.area_cabo || 'CTO')}</strong>
-        <small>${row.status}${row.bairro ? ' · ' + escHtml(row.bairro) : ''}${row.endereco ? ' · ' + escHtml(row.endereco) : ''}</small>
+// ── Lista lateral agrupada por área ───────────────────────────
+const openGroups = new Set()   // grupos expandidos
+const STATUS_COLORS = { 'Ativa': '#22c55e', 'Em manutenção': '#f59e0b', 'Danificada': '#ef4444', 'Desconhecida': '#6b7280' }
+
+function upsertListItem(_row) { renderGroupedList() }
+function removeListItem(_id)  { renderGroupedList() }
+
+function renderGroupedList() {
+  const lista = document.getElementById('lista-ctos')
+
+  // Agrupa por area_cabo
+  const groups = {}
+  Object.values(ctoData)
+    .filter(r => r.status_aprovacao === 'aprovado' || isAdmin)
+    .forEach(r => {
+      const key = r.area_cabo || '—'
+      if (!groups[key]) groups[key] = []
+      groups[key].push(r)
+    })
+
+  // Ordena grupos alfabeticamente
+  const sortedKeys = Object.keys(groups).sort()
+
+  lista.innerHTML = ''
+
+  sortedKeys.forEach(key => {
+    const rows = groups[key].sort((a, b) => (a.sp || '').localeCompare(b.sp || ''))
+    const isOpen = openGroups.has(key)
+
+    // Status geral do grupo (pior status)
+    const priority = ['Danificada', 'Em manutenção', 'Desconhecida', 'Ativa']
+    const worstStatus = priority.find(s => rows.some(r => r.status === s)) || 'Desconhecida'
+    const groupColor  = STATUS_COLORS[worstStatus] || '#6b7280'
+    const hasAlerta   = rows.some(r => (alertasCount[r.id] || 0) > 0)
+
+    const li = document.createElement('li')
+    li.className = 'group-li'
+    li.id = 'grp-' + CSS.escape(key)
+
+    const children = rows.map(r => {
+      const c    = STATUS_COLORS[r.status] || '#6b7280'
+      const info = [r.sp ? 'SP: ' + r.sp : '', r.sec ? 'SEC: ' + r.sec : '', r.status].filter(Boolean).join(' · ')
+      const alerta = (alertasCount[r.id] || 0) > 0 ? ' <span class="grp-alerta-dot">!</span>' : ''
+      return `<li class="group-child" onclick="focusMarker('${r.id}')">
+        <span class="dot" style="background:${c};flex-shrink:0"></span>
+        <div class="list-info">
+          <small>${escHtml(info)}${alerta}</small>
+          ${r.endereco ? `<small class="grp-addr">${escHtml([r.numero, r.endereco].filter(Boolean).join(' '))}</small>` : ''}
+        </div>
+        <span class="list-arrow">›</span>
+      </li>`
+    }).join('')
+
+    li.innerHTML = `
+      <div class="group-header" onclick="toggleGroup(${JSON.stringify(key)})">
+        <span class="group-chevron">${isOpen ? '▾' : '▸'}</span>
+        <span class="dot" style="background:${groupColor};flex-shrink:0"></span>
+        <div class="list-info">
+          <strong>${escHtml(key)}${hasAlerta ? ' <span class="grp-alerta-dot">!</span>' : ''}</strong>
+          <small>${rows.length} CTO${rows.length !== 1 ? 's' : ''}</small>
+        </div>
       </div>
-      <span class="list-arrow">›</span>
-    </div>`
+      <ul class="group-children" style="display:${isOpen ? 'block' : 'none'}">${children}</ul>`
+
+    lista.appendChild(li)
+  })
+
   updateCount()
 }
 
-function removeListItem(id) {
-  const li = document.getElementById('li-' + id)
-  if (li) li.remove()
-  updateCount()
+window.toggleGroup = function(key) {
+  if (openGroups.has(key)) openGroups.delete(key)
+  else openGroups.add(key)
+  renderGroupedList()
 }
 
 function updateCount() {
-  const n   = document.querySelectorAll('#lista-ctos li').length
+  const n   = Object.values(ctoData).filter(r => r.status_aprovacao === 'aprovado' || isAdmin).length
   const txt = n + ' CTO' + (n !== 1 ? 's' : '')
   document.getElementById('cto-count').textContent       = txt
   document.getElementById('cto-count-badge').textContent = txt
