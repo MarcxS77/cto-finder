@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import 'leaflet.markercluster'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_KEY
@@ -329,7 +332,8 @@ function makeDraggable(panelEl, fromLeft) {
 // ══════════════════════════════════════
 //  MAPA
 // ══════════════════════════════════════
-let map, markers = {}, pendingLatLng = null, tempMarker = null, ctoData = {}
+let map, clusterGroup, markers = {}, pendingLatLng = null, tempMarker = null, ctoData = {}
+const activeFilters = new Set(['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida'])
 
 function initMap() {
   map = L.map('map', { zoomControl: false }).setView([-23.5886, -46.6097], 15)
@@ -346,6 +350,30 @@ function initMap() {
     maxZoom: 22,
   }).addTo(map)
   L.control.zoom({ position: 'bottomright' }).addTo(map)
+
+  // Cluster de markers
+  clusterGroup = L.markerClusterGroup({
+    iconCreateFunction: (cluster) => L.divIcon({
+      html: `<div class="cto-cluster">${cluster.getChildCount()}</div>`,
+      className: '',
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
+    }),
+    maxClusterRadius: 70,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    zoomToBoundsOnClick: true,
+    animate: true,
+  })
+  map.addLayer(clusterGroup)
+
+  // Carrega comentários ao abrir popup
+  map.on('popupopen', (e) => {
+    const m = e.popup._source
+    if (m && m._ctoId) loadComentarios(m._ctoId)
+  })
+
+  initFilters()
 
   map.on('click', (e) => {
     if (document.getElementById('modal').style.display === 'flex') return
@@ -386,6 +414,36 @@ function initMap() {
     document.getElementById('painel-admin').classList.toggle('open')
   document.getElementById('btn-fechar-admin').onclick = () =>
     document.getElementById('painel-admin').classList.remove('open')
+}
+
+// ── Filtros de status ─────────────────────────────────────────
+function initFilters() {
+  document.querySelectorAll('.filtro-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const status = btn.dataset.status
+      if (activeFilters.has(status)) {
+        activeFilters.delete(status)
+        btn.classList.remove('active')
+      } else {
+        activeFilters.add(status)
+        btn.classList.add('active')
+      }
+      applyFilters()
+    })
+  })
+}
+
+function applyFilters() {
+  Object.entries(markers).forEach(([id, m]) => {
+    const row = ctoData[id]
+    if (!row || row.status_aprovacao === 'pendente') return
+    const visible = activeFilters.has(row.status)
+    if (visible) {
+      if (!clusterGroup.hasLayer(m)) clusterGroup.addLayer(m)
+    } else {
+      if (clusterGroup.hasLayer(m)) clusterGroup.removeLayer(m)
+    }
+  })
 }
 
 // ── Alertas ──────────────────────────────────────────────────
@@ -438,6 +496,7 @@ function refreshMarkerIcon(ctoId) {
   const row  = ctoData[ctoId]
   const icon = (alertasCount[ctoId] || 0) > 0 ? makeIconAlerta(row.status) : makeIcon(row.status)
   markers[ctoId].setIcon(icon)
+  clusterGroup.refreshClusters(markers[ctoId])
 }
 
 async function loadCtos() {
@@ -542,24 +601,26 @@ function makeIconPendente() {
 function addMarker(row) {
   ctoData[row.id] = row
   const icon = (alertasCount[row.id] || 0) > 0 ? makeIconAlerta(row.status) : makeIcon(row.status)
-  const m = L.marker([row.lat, row.lng], { icon })
-    .addTo(map).bindPopup(buildPopupHTML(row))
+  const m = L.marker([row.lat, row.lng], { icon }).bindPopup(buildPopupHTML(row))
+  m._ctoId = row.id
   markers[row.id] = m
+  if (activeFilters.has(row.status)) clusterGroup.addLayer(m)
   upsertListItem(row)
   if (isAdmin) { upsertTodasItem(row); upsertAtividadeItem(row) }
 }
 
 function addMarkerPendente(row) {
   ctoData[row.id] = row
-  const m = L.marker([row.lat, row.lng], { icon: makeIconPendente() })
-    .addTo(map).bindPopup(buildPopupPendenteHTML(row))
+  const m = L.marker([row.lat, row.lng], { icon: makeIconPendente() }).bindPopup(buildPopupPendenteHTML(row))
+  m._ctoId = row.id
   markers[row.id] = m
+  clusterGroup.addLayer(m)
   upsertPendenteItem(row)
   if (isAdmin) { upsertTodasItem(row); upsertAtividadeItem(row) }
 }
 
 function removeMarker(id) {
-  if (markers[id]) { markers[id].remove(); delete markers[id] }
+  if (markers[id]) { clusterGroup.removeLayer(markers[id]); delete markers[id] }
   delete ctoData[id]
 }
 
@@ -747,38 +808,84 @@ document.getElementById('form-cto').onsubmit = async (e) => {
   }
 }
 
+// ── Histórico ─────────────────────────────────────────────────
+async function logHistorico(ctoId, acao, alteracoes = null) {
+  if (!currentUser) return
+  const meta = currentUser.user_metadata
+  const userName = (meta && meta.full_name) || currentUser.email || 'Admin'
+  await sb.from('historico_ctos').insert({
+    cto_id: ctoId, user_id: currentUser.id, user_name: userName, acao, alteracoes,
+  })
+}
+
+async function loadHistorico() {
+  const container = document.getElementById('lista-historico')
+  if (!container) return
+  container.innerHTML = '<div class="usuarios-loading">Carregando…</div>'
+  const { data, error } = await sb.from('historico_ctos')
+    .select('id, cto_id, user_name, acao, alteracoes, created_at, ctos(area_cabo)')
+    .order('created_at', { ascending: false })
+    .limit(60)
+  if (error) { container.innerHTML = '<div class="usuarios-loading">Erro ao carregar.</div>'; return }
+  if (!data.length) { container.innerHTML = '<div class="usuarios-loading">Nenhuma alteração registrada ainda.</div>'; return }
+  const emojis = { editou: '✏️', aprovou: '✅', rejeitou: '❌', removeu: '🗑️', criou: '➕', 'mudou status': '🔄' }
+  container.innerHTML = data.map(h => {
+    const dt        = new Date(h.created_at).toLocaleString('pt-BR')
+    const area      = h.ctos?.area_cabo || 'CTO'
+    const firstName = (h.user_name || 'Admin').split(' ')[0]
+    const emoji     = emojis[h.acao] || '📝'
+    let detalhes = ''
+    if (h.alteracoes) {
+      const changed = Object.entries(h.alteracoes).map(([k, v]) => `${k}: ${escHtml(String(v))}`).join(' · ')
+      detalhes = `<div class="hist-detalhes">${changed}</div>`
+    }
+    return `
+      <div class="hist-item">
+        <div class="hist-icon">${emoji}</div>
+        <div class="hist-info">
+          <div class="hist-title"><strong>${escHtml(firstName)}</strong> ${h.acao} <em>${escHtml(area)}</em></div>
+          ${detalhes}
+          <div class="hist-date">🕒 ${dt}</div>
+        </div>
+      </div>`
+  }).join('')
+}
+
 // ── Aprovar / Rejeitar (admin) ────────────────────────────────
 window.aprovarCto = async (id) => {
   await sb.from(TABLE).update({ status_aprovacao: 'aprovado' }).eq('id', id)
+  logHistorico(id, 'aprovou')
   map.closePopup()
   document.getElementById('painel-admin').classList.remove('open')
 }
 
 window.rejeitarCto = async (id) => {
   if (!confirm('Rejeitar e remover esta CTO?')) return
+  logHistorico(id, 'rejeitou')
   await sb.from(TABLE).delete().eq('id', id)
   map.closePopup()
 }
 
 window.deleteCto = async (id) => {
   if (!confirm('Remover esta CTO?')) return
+  logHistorico(id, 'removeu')
   await sb.from(TABLE).delete().eq('id', id)
   map.closePopup()
 }
 
 window.changeStatus = async (id, newStatus) => {
+  const oldStatus = ctoData[id]?.status
   await sb.from(TABLE).update({ status: newStatus }).eq('id', id)
+  logHistorico(id, 'mudou status', { de: oldStatus, para: newStatus })
   map.closePopup()
 }
 
 window.focusMarker = (id) => {
   const m = markers[id]
-  if (m) {
-    map.flyTo(m.getLatLng(), 18)
-    setTimeout(() => m.openPopup(), 600)
-    document.getElementById('painel').classList.remove('open')
-    document.getElementById('painel-admin').classList.remove('open')
-  }
+  if (!m) return
+  document.getElementById('painel').classList.remove('open')
+  document.getElementById('painel-admin').classList.remove('open')
+  clusterGroup.zoomToShowLayer(m, () => setTimeout(() => m.openPopup(), 300))
 }
 
 // ── Modal ─────────────────────────────────────────────────────
@@ -862,6 +969,14 @@ function buildPopupHTML(row) {
       </a>
       ${alertaBtn}
       ${adminBtns}
+      <div class="popup-comments">
+        <div class="popup-comments-title">💬 Comentários</div>
+        <div id="cmt-${row.id}" class="cmt-list"><span class="cmt-empty">Carregando…</span></div>
+        <div class="cmt-input-row">
+          <input type="text" id="cmt-input-${row.id}" class="cmt-input" placeholder="Deixar observação…" maxlength="300" onkeydown="if(event.key==='Enter')addComentario('${row.id}')" />
+          <button class="cmt-send" onclick="addComentario('${row.id}')">↩</button>
+        </div>
+      </div>
     </div>`
 }
 
@@ -889,6 +1004,53 @@ function buildPopupPendenteHTML(row) {
         <button class="btn-rejeitar" onclick="rejeitarCto('${row.id}')">✕ Rejeitar</button>
       </div>
     </div>`
+}
+
+// ── Comentários ───────────────────────────────────────────────
+async function loadComentarios(ctoId) {
+  const container = document.getElementById('cmt-' + ctoId)
+  if (!container) return
+  const { data, error } = await sb.from('comentarios')
+    .select('id, user_name, texto, created_at, user_id')
+    .eq('cto_id', ctoId)
+    .order('created_at', { ascending: true })
+  if (error) { container.innerHTML = '<span class="cmt-empty" style="color:#ef4444">Erro ao carregar</span>'; return }
+  if (!data || !data.length) { container.innerHTML = '<span class="cmt-empty">Nenhum comentário ainda</span>'; return }
+  container.innerHTML = data.map(c => {
+    const firstName = (c.user_name || 'Anônimo').split(' ')[0]
+    const dt = new Date(c.created_at).toLocaleDateString('pt-BR')
+    const canDel = isAdmin || c.user_id === currentUser?.id
+    return `
+      <div class="cmt-item">
+        <div class="cmt-header">
+          <span class="cmt-author">${escHtml(firstName)}</span>
+          <span class="cmt-date">${dt}</span>
+          ${canDel ? `<button class="cmt-del" onclick="deleteComentario('${ctoId}','${c.id}')">✕</button>` : ''}
+        </div>
+        <div class="cmt-text">${escHtml(c.texto)}</div>
+      </div>`
+  }).join('')
+}
+
+window.addComentario = async (ctoId) => {
+  const input = document.getElementById('cmt-input-' + ctoId)
+  if (!input) return
+  const texto = input.value.trim()
+  if (!texto) return
+  const meta = currentUser?.user_metadata
+  const fullName = (meta && meta.full_name) || currentUser?.email || 'Usuário'
+  const { error } = await sb.from('comentarios').insert({
+    cto_id: ctoId,
+    user_id: currentUser?.id,
+    user_name: fullName,
+    texto,
+  })
+  if (!error) { input.value = ''; loadComentarios(ctoId) }
+}
+
+window.deleteComentario = async (ctoId, comentarioId) => {
+  await sb.from('comentarios').delete().eq('id', comentarioId)
+  loadComentarios(ctoId)
 }
 
 // ── Lista lateral agrupada por área ───────────────────────────
@@ -1019,17 +1181,17 @@ function updatePendenteCount() {
 
 // ── Painel admin: abas ────────────────────────────────────────
 window.switchAdminTab = function (tab) {
-  document.getElementById('lista-pendentes').style.display  = tab === 'pendentes'  ? 'block' : 'none'
-  document.getElementById('lista-todas').style.display      = tab === 'todas'      ? 'block' : 'none'
-  document.getElementById('lista-atividade').style.display  = tab === 'atividade'  ? 'block' : 'none'
-  document.getElementById('lista-usuarios').style.display   = tab === 'usuarios'   ? 'block' : 'none'
-  const dash = document.getElementById('lista-dashboard')
-  if (dash) dash.style.display = tab === 'dashboard' ? 'block' : 'none'
+  const ids = ['lista-pendentes','lista-todas','lista-atividade','lista-usuarios','lista-dashboard','lista-historico']
+  ids.forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.style.display = el.id === 'lista-' + tab ? 'block' : 'none'
+  })
   document.querySelectorAll('.admin-tab').forEach((t) =>
     t.classList.toggle('active', t.dataset.tab === tab)
   )
   if (tab === 'usuarios')  loadUsuarios()
   if (tab === 'dashboard') loadDashboard()
+  if (tab === 'historico') loadHistorico()
 }
 
 async function loadUsuarios() {
@@ -1039,7 +1201,6 @@ async function loadUsuarios() {
   const { data: perfis, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false })
   if (error) { container.innerHTML = '<div class="usuarios-loading">Erro ao carregar.</div>'; return }
 
-  // Conta CTOs por usuário (pelo email em submetido_por)
   const ctoCounts = {}
   Object.values(ctoData).forEach(row => {
     if (row.submetido_por) ctoCounts[row.submetido_por] = (ctoCounts[row.submetido_por] || 0) + 1
@@ -1052,28 +1213,53 @@ async function loadUsuarios() {
     return
   }
 
-  perfis.forEach(p => {
-    const nome    = p.full_name || p.email || 'Sem nome'
-    const inicial = nome[0].toUpperCase()
-    const dt      = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'
-    const ctos    = ctoCounts[p.email] || 0
-    const isAdminUser = !!p.is_admin
+  // Campo de busca
+  const searchWrap = document.createElement('div')
+  searchWrap.className = 'usuario-search-wrap'
+  searchWrap.innerHTML = `<input type="text" class="usuario-search-input" id="usuario-search" placeholder="🔍 Buscar por nome ou email…" />`
+  container.appendChild(searchWrap)
 
-    const card = document.createElement('div')
-    card.className = 'usuario-card'
-    card.innerHTML = `
-      <div class="usuario-avatar">
-        ${p.avatar_url
-          ? `<img src="${p.avatar_url}" alt="avatar" />`
-          : `<span>${escHtml(inicial)}</span>`}
-      </div>
-      <div class="usuario-info">
-        <div class="usuario-nome">${escHtml(nome)} ${isAdminUser ? '<span class="usuario-admin-badge">admin</span>' : ''}</div>
-        <div class="usuario-email">${escHtml(p.email || '—')}</div>
-        <div class="usuario-meta">📅 ${dt} · 📦 ${ctos} CTO${ctos !== 1 ? 's' : ''}</div>
-      </div>`
-    container.appendChild(card)
-  })
+  const cardsWrap = document.createElement('div')
+  cardsWrap.id = 'usuario-cards'
+  container.appendChild(cardsWrap)
+
+  function renderCards(filtro) {
+    const q = (filtro || '').toLowerCase()
+    cardsWrap.innerHTML = ''
+    const filtrados = perfis.filter(p => {
+      const nome  = (p.full_name || '').toLowerCase()
+      const email = (p.email || '').toLowerCase()
+      return !q || nome.includes(q) || email.includes(q)
+    })
+    if (!filtrados.length) {
+      cardsWrap.innerHTML = '<div class="usuarios-loading">Nenhum resultado.</div>'
+      return
+    }
+    filtrados.forEach(p => {
+      const nome    = p.full_name || p.email || 'Sem nome'
+      const inicial = nome[0].toUpperCase()
+      const dt      = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'
+      const ctos    = ctoCounts[p.email] || 0
+      const isAdminUser = !!p.is_admin
+      const card = document.createElement('div')
+      card.className = 'usuario-card'
+      card.innerHTML = `
+        <div class="usuario-avatar">
+          ${p.avatar_url
+            ? `<img src="${p.avatar_url}" alt="avatar" />`
+            : `<span>${escHtml(inicial)}</span>`}
+        </div>
+        <div class="usuario-info">
+          <div class="usuario-nome">${escHtml(nome)} ${isAdminUser ? '<span class="usuario-admin-badge">admin</span>' : ''}</div>
+          <div class="usuario-email">${escHtml(p.email || '—')}</div>
+          <div class="usuario-meta">📅 ${dt} · 📦 ${ctos} CTO${ctos !== 1 ? 's' : ''}</div>
+        </div>`
+      cardsWrap.appendChild(card)
+    })
+  }
+
+  renderCards('')
+  document.getElementById('usuario-search').addEventListener('input', (e) => renderCards(e.target.value))
 }
 
 // ── Lista "Todas as CTOs" (admin) ─────────────────────────────
@@ -1198,6 +1384,11 @@ function initAdminPanel() {
       msg.textContent = 'Erro: ' + error.message
       msg.className   = 'geocode-msg error'
     } else {
+      logHistorico(id, 'editou', {
+        endereco: document.getElementById('edit-endereco').value.trim(),
+        status:   document.getElementById('edit-status').value,
+        aprovacao: document.getElementById('edit-status-aprovacao').value,
+      })
       document.getElementById('modal-edit').style.display = 'none'
     }
   }
@@ -1205,6 +1396,7 @@ function initAdminPanel() {
 
 window.deleteCtoAdmin = async (id) => {
   if (!confirm('Remover esta CTO permanentemente?')) return
+  logHistorico(id, 'removeu')
   await sb.from(TABLE).delete().eq('id', id)
 }
 
@@ -1254,6 +1446,25 @@ async function loadDashboard() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
   const maxArea = topAreas[0]?.[1] || 1
+
+  // ─── Gráfico temporal: últimos 6 meses ────────────────────
+  const now    = new Date()
+  const months = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({
+      label: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
+      key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      count: 0,
+    })
+  }
+  ctos.forEach(c => {
+    if (!c.criado) return
+    const key = c.criado.substring(0, 7)
+    const m   = months.find(m => m.key === key)
+    if (m) m.count++
+  })
+  const maxMonthCount = Math.max(...months.map(m => m.count), 1)
 
   // ─── Atividade recente (últimas 5 inserções) ───────────────
   const recentes = [...ctos]
@@ -1369,6 +1580,24 @@ async function loadDashboard() {
             <span class="dash-health-status ${comAlerta > 0 ? 'warn' : 'ok'}">${comAlerta > 0 ? comAlerta + ' alerta' + (comAlerta !== 1 ? 's' : '') : 'Nenhum'}</span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Gráfico temporal -->
+    <div class="dash-panel">
+      <div class="dash-panel-title">📈 CTOs cadastradas por mês</div>
+      <div class="dash-timeline">
+        ${months.map(m => {
+          const pct = Math.round((m.count / maxMonthCount) * 100)
+          return `
+          <div class="dash-tl-col">
+            <div class="dash-tl-bar-wrap">
+              <div class="dash-tl-count">${m.count > 0 ? m.count : ''}</div>
+              <div class="dash-tl-bar" style="height:${pct}%"></div>
+            </div>
+            <div class="dash-tl-label">${m.label}</div>
+          </div>`
+        }).join('')}
       </div>
     </div>
 
