@@ -494,7 +494,7 @@ window.dispensarAlertas = async (ctoId) => {
 function refreshMarkerIcon(ctoId) {
   if (!markers[ctoId] || !ctoData[ctoId]) return
   const row  = ctoData[ctoId]
-  const icon = (alertasCount[ctoId] || 0) > 0 ? makeIconAlerta(row.status) : makeIcon(row.status)
+  const icon = (alertasCount[ctoId] || 0) > 0 ? makeIconAlerta(row.status, row) : makeIcon(row.status, row)
   markers[ctoId].setIcon(icon)
   clusterGroup.refreshClusters(markers[ctoId])
 }
@@ -551,56 +551,71 @@ async function loadCtos() {
 }
 
 // ── Ícones ────────────────────────────────────────────────────
-function makeIcon(status) {
+function markerLabel(row) {
+  const area = row?.area_cabo || ''
+  const sp   = row?.sp        ? 'SP: ' + row.sp : ''
+  return { area, sp }
+}
+
+function makeIcon(status, row) {
   const colors = {
     'Ativa': '#22c55e', 'Em manutenção': '#f59e0b',
     'Danificada': '#ef4444', 'Desconhecida': '#6b7280',
   }
   const c = colors[status] || '#6b7280'
+  const { area, sp } = markerLabel(row)
   const html = `
-    <div style="
-      color:${c};
-      font-size:38px;
-      line-height:1;
-      filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));
-    ">
+    <div style="position:relative;display:inline-block;color:${c};font-size:38px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));">
       <i class="ph-fill ph-battery-vertical-full"></i>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+        background:rgba(0,0,0,0.72);border-radius:3px;padding:1px 3px;
+        text-align:center;pointer-events:none;white-space:nowrap;line-height:1.35;">
+        <div style="font-size:7px;font-weight:800;color:#fff;font-family:monospace">${escHtml(area)}</div>
+        ${sp ? `<div style="font-size:6px;font-weight:700;color:#aaa;font-family:monospace">${escHtml(sp)}</div>` : ''}
+      </div>
     </div>`
   return L.divIcon({ html, className: '', iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
 }
 
-function makeIconAlerta(status) {
+function makeIconAlerta(status, row) {
   const colors = {
     'Ativa': '#22c55e', 'Em manutenção': '#f59e0b',
     'Danificada': '#ef4444', 'Desconhecida': '#6b7280',
   }
   const c = colors[status] || '#6b7280'
+  const { area, sp } = markerLabel(row)
   const html = `
-    <div style="position:relative;display:inline-block;">
-      <div style="color:${c};font-size:38px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));">
-        <i class="ph-fill ph-battery-vertical-full"></i>
+    <div style="position:relative;display:inline-block;color:${c};font-size:38px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));">
+      <i class="ph-fill ph-battery-vertical-full"></i>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+        background:rgba(0,0,0,0.72);border-radius:3px;padding:1px 3px;
+        text-align:center;pointer-events:none;white-space:nowrap;line-height:1.35;">
+        <div style="font-size:7px;font-weight:800;color:#fff;font-family:monospace">${escHtml(area)}</div>
+        ${sp ? `<div style="font-size:6px;font-weight:700;color:#aaa;font-family:monospace">${escHtml(sp)}</div>` : ''}
       </div>
       <div style="position:absolute;top:-4px;right:-6px;background:#f97316;color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;line-height:1;">!</div>
     </div>`
   return L.divIcon({ html, className: '', iconSize: [44, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
 }
 
-function makeIconPendente() {
+function makeIconPendente(row) {
+  const { area, sp } = markerLabel(row)
   const html = `
-    <div class="marker-pendente" style="
-      color:#f59e0b;
-      font-size:38px;
-      line-height:1;
-      filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));
-    ">
+    <div style="position:relative;display:inline-block;color:#f59e0b;font-size:38px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));">
       <i class="ph-fill ph-battery-vertical-full"></i>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+        background:rgba(0,0,0,0.72);border-radius:3px;padding:1px 3px;
+        text-align:center;pointer-events:none;white-space:nowrap;line-height:1.35;">
+        <div style="font-size:7px;font-weight:800;color:#fff;font-family:monospace">${escHtml(area) || '⏳'}</div>
+        ${sp ? `<div style="font-size:6px;font-weight:700;color:#aaa;font-family:monospace">${escHtml(sp)}</div>` : ''}
+      </div>
     </div>`
   return L.divIcon({ html, className: '', iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
 }
 
 function addMarker(row) {
   ctoData[row.id] = row
-  const icon = (alertasCount[row.id] || 0) > 0 ? makeIconAlerta(row.status) : makeIcon(row.status)
+  const icon = (alertasCount[row.id] || 0) > 0 ? makeIconAlerta(row.status, row) : makeIcon(row.status, row)
   const m = L.marker([row.lat, row.lng], { icon }).bindPopup(buildPopupHTML(row))
   m._ctoId = row.id
   markers[row.id] = m
@@ -611,7 +626,7 @@ function addMarker(row) {
 
 function addMarkerPendente(row) {
   ctoData[row.id] = row
-  const m = L.marker([row.lat, row.lng], { icon: makeIconPendente() }).bindPopup(buildPopupPendenteHTML(row))
+  const m = L.marker([row.lat, row.lng], { icon: makeIconPendente(row) }).bindPopup(buildPopupPendenteHTML(row))
   m._ctoId = row.id
   markers[row.id] = m
   clusterGroup.addLayer(m)
