@@ -630,14 +630,17 @@ body {
   background: #0f0700;
   border-bottom: 1px solid #3b1a00;
   flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.admin-tabs::-webkit-scrollbar { display: none; }
 .admin-tab {
-  flex: 1;
-  padding: 11px 8px;
+  flex: 0 0 auto;
+  padding: 10px 14px;
   border: none;
   background: transparent;
   color: #92400e;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -645,7 +648,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
 }
 .admin-tab.active {
   color: #fcd34d;
