@@ -630,13 +630,9 @@ document.getElementById('f-endereco').addEventListener('input', () => {
       const bairroHint = document.getElementById('f-bairro').value.trim()
       const query = [val, bairroHint].filter(Boolean).join(', ')
       if (MAPBOX_TOKEN) {
-        const center  = map ? map.getCenter() : { lat: -23.5886, lng: -46.6097 }
-        const prox    = `${center.lng},${center.lat}`
-        const bounds  = map ? map.getBounds() : null
-        const bboxStr = bounds
-          ? `&bbox=${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`
-          : ''
-        const url  = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&autocomplete=true&limit=6&proximity=${prox}${bboxStr}`
+        // proximity = centro de SP para priorizar a cidade sem restringir outros bairros
+        const SP_CENTER = '-46.6333,-23.5505'
+        const url  = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&autocomplete=true&limit=6&proximity=${SP_CENTER}`
         const res  = await fetch(url)
         const data = await res.json()
         showAutocomplete(data.features || [])
@@ -662,10 +658,8 @@ async function geocodeAddress(endereco, numero, bairro) {
   if (MAPBOX_TOKEN) {
     try {
       // Mapbox interpola numeração com precisão
-      const query  = [numero ? `${numero} ${endereco}` : endereco, bairro].filter(Boolean).join(', ')
-      const center = map ? map.getCenter() : { lat: -23.55, lng: -46.63 }
-      const prox   = `${center.lng},${center.lat}`
-      const url    = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&limit=1&proximity=${prox}`
+      const query  = [numero ? `${numero} ${endereco}` : endereco, bairro, 'São Paulo'].filter(Boolean).join(', ')
+      const url    = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=BR&language=pt&types=address&limit=1&proximity=-46.6333,-23.5505`
       const res   = await fetch(url)
       const data  = await res.json()
       if (data.features && data.features.length > 0) {
