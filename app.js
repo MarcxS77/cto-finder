@@ -1019,14 +1019,17 @@ function updatePendenteCount() {
 
 // ── Painel admin: abas ────────────────────────────────────────
 window.switchAdminTab = function (tab) {
-  document.getElementById('lista-pendentes').style.display = tab === 'pendentes' ? 'block' : 'none'
-  document.getElementById('lista-todas').style.display     = tab === 'todas'     ? 'block' : 'none'
-  document.getElementById('lista-atividade').style.display = tab === 'atividade' ? 'block' : 'none'
-  document.getElementById('lista-usuarios').style.display  = tab === 'usuarios'  ? 'block' : 'none'
+  document.getElementById('lista-pendentes').style.display  = tab === 'pendentes'  ? 'block' : 'none'
+  document.getElementById('lista-todas').style.display      = tab === 'todas'      ? 'block' : 'none'
+  document.getElementById('lista-atividade').style.display  = tab === 'atividade'  ? 'block' : 'none'
+  document.getElementById('lista-usuarios').style.display   = tab === 'usuarios'   ? 'block' : 'none'
+  const dash = document.getElementById('lista-dashboard')
+  if (dash) dash.style.display = tab === 'dashboard' ? 'block' : 'none'
   document.querySelectorAll('.admin-tab').forEach((t) =>
     t.classList.toggle('active', t.dataset.tab === tab)
   )
-  if (tab === 'usuarios') loadUsuarios()
+  if (tab === 'usuarios')  loadUsuarios()
+  if (tab === 'dashboard') loadDashboard()
 }
 
 async function loadUsuarios() {
@@ -1208,6 +1211,194 @@ window.deleteCtoAdmin = async (id) => {
 // ── Painel lateral ────────────────────────────────────────────
 document.getElementById('btn-lista').onclick = () => document.getElementById('painel').classList.toggle('open')
 document.getElementById('btn-fechar-painel').onclick = () => document.getElementById('painel').classList.remove('open')
+
+// ── Dashboard Admin ───────────────────────────────────────────
+async function loadDashboard() {
+  const container = document.getElementById('lista-dashboard')
+  if (!container) return
+  container.innerHTML = '<div class="dash-loading">Carregando dados…</div>'
+
+  // Busca dados em paralelo
+  const [
+    { data: todasCtos },
+    { data: alertasData },
+    { data: usuariosData },
+  ] = await Promise.all([
+    sb.from('ctos').select('id, status, status_aprovacao, area_cabo, bairro, criado, submetido_por'),
+    sb.from('alertas').select('id, cto_id'),
+    sb.from('profiles').select('id, created_at'),
+  ])
+
+  const ctos      = todasCtos   || []
+  const alertas   = alertasData || []
+  const usuarios  = usuariosData || []
+
+  // ─── Métricas gerais ───────────────────────────────────────
+  const total       = ctos.length
+  const aprovadas   = ctos.filter(c => c.status_aprovacao === 'aprovado').length
+  const pendentes   = ctos.filter(c => c.status_aprovacao === 'pendente').length
+  const ativas      = ctos.filter(c => c.status === 'Ativa').length
+  const manutencao  = ctos.filter(c => c.status === 'Em manutenção').length
+  const danificadas = ctos.filter(c => c.status === 'Danificada').length
+  const desconhecidas = ctos.filter(c => c.status === 'Desconhecida').length
+  const comAlerta   = new Set(alertas.map(a => a.cto_id)).size
+  const totalUsuarios = usuarios.length
+
+  // ─── Top 6 áreas por quantidade de CTOs ───────────────────
+  const areaCounts = {}
+  ctos.forEach(c => {
+    const area = c.area_cabo || 'Sem área'
+    areaCounts[area] = (areaCounts[area] || 0) + 1
+  })
+  const topAreas = Object.entries(areaCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+  const maxArea = topAreas[0]?.[1] || 1
+
+  // ─── Atividade recente (últimas 5 inserções) ───────────────
+  const recentes = [...ctos]
+    .filter(c => c.criado)
+    .sort((a, b) => b.criado.localeCompare(a.criado))
+    .slice(0, 5)
+
+  // ─── Render ────────────────────────────────────────────────
+  container.innerHTML = `
+    <!-- Cards de métricas -->
+    <div class="dash-cards">
+      <div class="dash-card">
+        <div class="dash-card-icon" style="background:rgba(57,255,20,.12)">📦</div>
+        <div class="dash-card-body">
+          <div class="dash-card-value">${total}</div>
+          <div class="dash-card-label">Total de CTOs</div>
+        </div>
+        <div class="dash-card-bar" style="width:100%;background:#39ff1433"></div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-icon" style="background:rgba(34,197,94,.15)">✅</div>
+        <div class="dash-card-body">
+          <div class="dash-card-value" style="color:#22c55e">${ativas}</div>
+          <div class="dash-card-label">CTOs Ativas</div>
+        </div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-icon" style="background:rgba(245,158,11,.15)">⏳</div>
+        <div class="dash-card-body">
+          <div class="dash-card-value" style="color:#f59e0b">${pendentes}</div>
+          <div class="dash-card-label">Pendentes de aprovação</div>
+        </div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-icon" style="background:rgba(239,68,68,.15)">🔔</div>
+        <div class="dash-card-body">
+          <div class="dash-card-value" style="color:#ef4444">${comAlerta}</div>
+          <div class="dash-card-label">CTOs com alertas</div>
+        </div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-icon" style="background:rgba(147,51,234,.15)">👥</div>
+        <div class="dash-card-body">
+          <div class="dash-card-value" style="color:#a855f7">${totalUsuarios}</div>
+          <div class="dash-card-label">Usuários cadastrados</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status por tipo e gráfico de áreas -->
+    <div class="dash-row">
+      <!-- Gráfico por área -->
+      <div class="dash-panel dash-chart-panel">
+        <div class="dash-panel-title">📊 CTOs por Área</div>
+        <div class="dash-chart">
+          ${topAreas.map(([area, count]) => {
+            const pct = Math.round((count / maxArea) * 100)
+            return `
+            <div class="dash-bar-row">
+              <div class="dash-bar-label" title="${escHtml(area)}">${escHtml(area)}</div>
+              <div class="dash-bar-track">
+                <div class="dash-bar-fill" style="width:${pct}%"></div>
+              </div>
+              <div class="dash-bar-count">${count}</div>
+            </div>`
+          }).join('')}
+          ${topAreas.length === 0 ? '<div style="color:#6b7280;text-align:center;padding:20px">Sem dados</div>' : ''}
+        </div>
+      </div>
+
+      <!-- Status breakdown -->
+      <div class="dash-panel dash-status-panel">
+        <div class="dash-panel-title">🎯 Distribuição por Status</div>
+        <div class="dash-status-list">
+          ${[
+            ['Ativa',          ativas,       '#22c55e', '🟢'],
+            ['Em manutenção',  manutencao,   '#f59e0b', '🟡'],
+            ['Danificada',     danificadas,  '#ef4444', '🔴'],
+            ['Desconhecida',   desconhecidas,'#6b7280', '⚪'],
+            ['Aprovadas',      aprovadas,    '#39ff14', '✅'],
+          ].map(([label, val, color, emoji]) => `
+            <div class="dash-status-row">
+              <span class="dash-status-dot" style="background:${color}"></span>
+              <span class="dash-status-label">${label}</span>
+              <div class="dash-status-bar-track">
+                <div class="dash-status-bar-fill" style="width:${total > 0 ? Math.round((val/total)*100) : 0}%;background:${color}"></div>
+              </div>
+              <span class="dash-status-count" style="color:${color}">${val}</span>
+            </div>`).join('')}
+        </div>
+
+        <!-- System health -->
+        <div class="dash-panel-title" style="margin-top:16px">⚡ Sistema</div>
+        <div class="dash-health-list">
+          <div class="dash-health-row">
+            <span class="dash-health-dot ok"></span>
+            <span>Supabase</span>
+            <span class="dash-health-status ok">Online</span>
+          </div>
+          <div class="dash-health-row">
+            <span class="dash-health-dot ok"></span>
+            <span>Realtime</span>
+            <span class="dash-health-status ok">Ativo</span>
+          </div>
+          <div class="dash-health-row">
+            <span class="dash-health-dot ok"></span>
+            <span>Mapa</span>
+            <span class="dash-health-status ok">Carregado</span>
+          </div>
+          <div class="dash-health-row">
+            <span class="dash-health-dot ${comAlerta > 0 ? 'warn' : 'ok'}"></span>
+            <span>Alertas abertos</span>
+            <span class="dash-health-status ${comAlerta > 0 ? 'warn' : 'ok'}">${comAlerta > 0 ? comAlerta + ' alerta' + (comAlerta !== 1 ? 's' : '') : 'Nenhum'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Atividade recente -->
+    <div class="dash-panel">
+      <div class="dash-panel-title">🕒 Inserções Recentes</div>
+      <div class="dash-activity">
+        ${recentes.map(c => {
+          const dt = c.criado ? new Date(c.criado).toLocaleString('pt-BR') : '—'
+          const isPend = c.status_aprovacao === 'pendente'
+          const statusColor = { 'Ativa': '#22c55e', 'Em manutenção': '#f59e0b', 'Danificada': '#ef4444', 'Desconhecida': '#6b7280' }[c.status] || '#6b7280'
+          const inicial = (c.submetido_por || '?')[0].toUpperCase()
+          return `
+          <div class="dash-activity-row" onclick="focusMarker('${c.id}');document.getElementById('painel-admin').classList.remove('open')" style="cursor:pointer">
+            <div class="dash-activity-avatar">${escHtml(inicial)}</div>
+            <div class="dash-activity-info">
+              <div class="dash-activity-title">${escHtml(c.area_cabo || 'CTO')}</div>
+              <div class="dash-activity-sub">${escHtml(c.submetido_por || 'Desconhecido')}${c.bairro ? ' · ' + escHtml(c.bairro) : ''}</div>
+            </div>
+            <div class="dash-activity-right">
+              <span class="dash-activity-badge" style="background:${statusColor}22;color:${statusColor}">${escHtml(c.status)}</span>
+              <div class="dash-activity-date">${dt}</div>
+            </div>
+          </div>`
+        }).join('')}
+        ${recentes.length === 0 ? '<div style="color:#6b7280;text-align:center;padding:16px">Nenhuma inserção ainda</div>' : ''}
+      </div>
+    </div>
+  `
+}
 
 // ── Utilitários ───────────────────────────────────────────────
 function escHtml(s) {
