@@ -558,59 +558,53 @@ function markerLabel(row) {
 }
 
 function makeIcon(status, row) {
-  const colors = {
-    'Ativa': '#22c55e', 'Em manutenção': '#f59e0b',
-    'Danificada': '#ef4444', 'Desconhecida': '#6b7280',
-  }
+  const colors = { 'Ativa': '#22c55e', 'Em manutenção': '#f59e0b', 'Danificada': '#ef4444', 'Desconhecida': '#6b7280' }
   const c = colors[status] || '#6b7280'
   const { area, sp } = markerLabel(row)
   const html = `
-    <div style="position:relative;display:inline-block;color:${c};font-size:38px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));">
-      <i class="ph-fill ph-battery-vertical-full"></i>
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-        background:rgba(0,0,0,0.72);border-radius:3px;padding:1px 3px;
-        text-align:center;pointer-events:none;white-space:nowrap;line-height:1.35;">
-        <div style="font-size:7px;font-weight:800;color:#fff;font-family:monospace">${escHtml(area)}</div>
-        ${sp ? `<div style="font-size:6px;font-weight:700;color:#aaa;font-family:monospace">${escHtml(sp)}</div>` : ''}
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div style="color:${c};font-size:34px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.8))">
+        <i class="ph-fill ph-battery-vertical-full"></i>
+      </div>
+      <div style="background:#060f07;border:1.5px solid ${c};border-radius:4px;padding:2px 6px;margin-top:1px;text-align:center;white-space:nowrap;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.6)">
+        <div style="font-size:10px;font-weight:800;color:#fff;font-family:'Courier New',monospace;letter-spacing:0.01em">${area}</div>
+        ${sp ? `<div style="font-size:9px;font-weight:600;color:#94a3b8;font-family:'Courier New',monospace">${sp}</div>` : ''}
       </div>
     </div>`
-  return L.divIcon({ html, className: '', iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
+  return L.divIcon({ html, className: '', iconSize: [72, 62], iconAnchor: [36, 62], popupAnchor: [0, -62] })
 }
 
 function makeIconAlerta(status, row) {
-  const colors = {
-    'Ativa': '#22c55e', 'Em manutenção': '#f59e0b',
-    'Danificada': '#ef4444', 'Desconhecida': '#6b7280',
-  }
+  const colors = { 'Ativa': '#22c55e', 'Em manutenção': '#f59e0b', 'Danificada': '#ef4444', 'Desconhecida': '#6b7280' }
   const c = colors[status] || '#6b7280'
   const { area, sp } = markerLabel(row)
   const html = `
-    <div style="position:relative;display:inline-block;color:${c};font-size:38px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));">
-      <i class="ph-fill ph-battery-vertical-full"></i>
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-        background:rgba(0,0,0,0.72);border-radius:3px;padding:1px 3px;
-        text-align:center;pointer-events:none;white-space:nowrap;line-height:1.35;">
-        <div style="font-size:7px;font-weight:800;color:#fff;font-family:monospace">${escHtml(area)}</div>
-        ${sp ? `<div style="font-size:6px;font-weight:700;color:#aaa;font-family:monospace">${escHtml(sp)}</div>` : ''}
+    <div style="display:flex;flex-direction:column;align-items:center;position:relative;">
+      <div style="color:${c};font-size:34px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.8))">
+        <i class="ph-fill ph-battery-vertical-full"></i>
       </div>
-      <div style="position:absolute;top:-4px;right:-6px;background:#f97316;color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;line-height:1;">!</div>
+      <div style="position:absolute;top:-5px;right:-2px;background:#f97316;color:#fff;font-size:11px;font-weight:800;border-radius:50%;width:17px;height:17px;display:flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 0 6px rgba(249,115,22,0.7)">!</div>
+      <div style="background:#060f07;border:1.5px solid ${c};border-radius:4px;padding:2px 6px;margin-top:1px;text-align:center;white-space:nowrap;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.6)">
+        <div style="font-size:10px;font-weight:800;color:#fff;font-family:'Courier New',monospace;letter-spacing:0.01em">${area}</div>
+        ${sp ? `<div style="font-size:9px;font-weight:600;color:#94a3b8;font-family:'Courier New',monospace">${sp}</div>` : ''}
+      </div>
     </div>`
-  return L.divIcon({ html, className: '', iconSize: [44, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
+  return L.divIcon({ html, className: '', iconSize: [72, 62], iconAnchor: [36, 62], popupAnchor: [0, -62] })
 }
 
 function makeIconPendente(row) {
   const { area, sp } = markerLabel(row)
   const html = `
-    <div style="position:relative;display:inline-block;color:#f59e0b;font-size:38px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.7));">
-      <i class="ph-fill ph-battery-vertical-full"></i>
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-        background:rgba(0,0,0,0.72);border-radius:3px;padding:1px 3px;
-        text-align:center;pointer-events:none;white-space:nowrap;line-height:1.35;">
-        <div style="font-size:7px;font-weight:800;color:#fff;font-family:monospace">${escHtml(area) || '⏳'}</div>
-        ${sp ? `<div style="font-size:6px;font-weight:700;color:#aaa;font-family:monospace">${escHtml(sp)}</div>` : ''}
+    <div style="display:flex;flex-direction:column;align-items:center;opacity:0.8;">
+      <div style="color:#f59e0b;font-size:34px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.8))">
+        <i class="ph-fill ph-battery-vertical-full"></i>
+      </div>
+      <div style="background:#060f07;border:1.5px solid #f59e0b;border-radius:4px;padding:2px 6px;margin-top:1px;text-align:center;white-space:nowrap;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.6)">
+        <div style="font-size:10px;font-weight:800;color:#fff;font-family:'Courier New',monospace">${area || '⏳'}</div>
+        ${sp ? `<div style="font-size:9px;font-weight:600;color:#94a3b8;font-family:'Courier New',monospace">${sp}</div>` : ''}
       </div>
     </div>`
-  return L.divIcon({ html, className: '', iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38] })
+  return L.divIcon({ html, className: '', iconSize: [72, 62], iconAnchor: [36, 62], popupAnchor: [0, -62] })
 }
 
 function addMarker(row) {
