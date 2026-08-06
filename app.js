@@ -336,7 +336,7 @@ let map, clusterGroup, markers = {}, pendingLatLng = null, tempMarker = null, ct
 const activeFilters = new Set(['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida'])
 
 function initMap() {
-  map = L.map('map', { zoomControl: false }).setView([-23.5886, -46.6097], 15)
+  map = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.5886, -46.6097], 15)
   const tileUrl = MAPBOX_TOKEN
     ? `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
     : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
