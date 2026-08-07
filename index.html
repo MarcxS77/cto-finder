@@ -6,6 +6,7 @@
   <title>CTO FINDER</title>
   <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
 </head>
 <body>
 
@@ -157,6 +158,24 @@
             <option>Desconhecida</option>
           </select>
         </div>
+        <!-- FTTA -->
+        <label class="ftta-toggle">
+          <input type="checkbox" id="f-ftta" onchange="toggleFttaFields(this.checked)" />
+          <span class="ftta-toggle-box"></span>
+          <span class="ftta-toggle-label"><i class="ph ph-building"></i> FTTA — Fibra até o Apartamento</span>
+        </label>
+        <div id="ftta-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Andar</label>
+              <input id="f-andar" type="text" placeholder="Ex: 3" maxlength="10" />
+            </div>
+            <div class="form-group">
+              <label>Complemento</label>
+              <input id="f-complemento" type="text" placeholder="Ex: Ap 301" maxlength="40" />
+            </div>
+          </div>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn-secondary" id="btn-cancelar">Cancelar</button>
           <button type="submit" class="btn-primary"   id="btn-salvar">Salvar</button>
@@ -264,6 +283,23 @@
             <option value="aprovado">Aprovado</option>
             <option value="pendente">Pendente</option>
           </select>
+        </div>
+      </div>
+      <label class="ftta-toggle" style="margin-bottom:10px">
+        <input type="checkbox" id="edit-ftta" onchange="toggleEditFttaFields(this.checked)" />
+        <span class="ftta-toggle-box"></span>
+        <span class="ftta-toggle-label"><i class="ph ph-building"></i> FTTA</span>
+      </label>
+      <div id="edit-ftta-fields" style="display:none">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Andar</label>
+            <input id="edit-andar" type="text" placeholder="Ex: 3" maxlength="10" />
+          </div>
+          <div class="form-group">
+            <label>Complemento</label>
+            <input id="edit-complemento" type="text" placeholder="Ex: Ap 301" maxlength="40" />
+          </div>
         </div>
       </div>
       <div id="edit-msg" class="geocode-msg" style="margin-bottom:8px"></div>

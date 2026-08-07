@@ -335,6 +335,17 @@ function makeDraggable(panelEl, fromLeft) {
 let map, clusterGroup, markers = {}, pendingLatLng = null, tempMarker = null, ctoData = {}
 const activeFilters = new Set(['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida'])
 
+// Agrupamento de prédios FTTA
+const buildingGroups  = {}   // key → { lat, lng, ctos: [id] }
+const buildingMarkers = {}   // key → Leaflet marker
+
+function getBuildingKey(row) {
+  const end = (row.endereco || '').toLowerCase().trim()
+  const num = (row.numero   || '').toLowerCase().trim()
+  const bai = (row.bairro   || '').toLowerCase().trim()
+  return `${end}|${num}|${bai}`
+}
+
 function initMap() {
   map = L.map('map', { zoomControl: false, attributionControl: false }).setView([-23.5886, -46.6097], 15)
   const tileUrl = MAPBOX_TOKEN
@@ -635,13 +646,110 @@ function makeIconPendente(row) {
   return L.divIcon({ html, className: '', iconSize: [72, 62], iconAnchor: [36, 62], popupAnchor: [0, -62] })
 }
 
+// ── Ícone e popup de prédio FTTA ──────────────────────────────
+function makeBuildingIcon(ctosArr) {
+  const priority = ['Danificada', 'Em manutenção', 'Desconhecida', 'Ativa']
+  const worst  = priority.find(s => ctosArr.some(c => c.status === s)) || 'Ativa'
+  const colors = { 'Ativa': '#22c55e', 'Em manutenção': '#f59e0b', 'Danificada': '#ef4444', 'Desconhecida': '#6b7280' }
+  const c     = colors[worst]
+  const count = ctosArr.length
+  const area  = ctosArr[0]?.area_cabo || 'FTTA'
+  const html  = `
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div style="position:relative;color:${c};font-size:36px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.8))">
+        <i class="ph ph-building"></i>
+        <div style="position:absolute;top:-5px;right:-8px;background:${c};color:#000;font-size:9px;font-weight:900;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;line-height:1;">${count}</div>
+      </div>
+      <div style="background:#060f07;border:1.5px solid ${c};border-radius:4px;padding:2px 6px;margin-top:1px;text-align:center;white-space:nowrap;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.6)">
+        <div style="font-size:10px;font-weight:800;color:#fff;font-family:'Courier New',monospace">${escHtml(area)}</div>
+        <div style="font-size:9px;font-weight:600;color:#94a3b8;font-family:'Courier New',monospace">${count} andar${count !== 1 ? 'es' : ''}</div>
+      </div>
+    </div>`
+  return L.divIcon({ html, className: '', iconSize: [72, 62], iconAnchor: [36, 62], popupAnchor: [0, -62] })
+}
+
+function buildBuildingPopupHTML(key) {
+  const group   = buildingGroups[key]
+  if (!group) return ''
+  const ctosArr = group.ctos.map(id => ctoData[id]).filter(Boolean)
+    .sort((a, b) => {
+      const ai = parseInt(a.andar) || 0
+      const bi = parseInt(b.andar) || 0
+      return ai - bi
+    })
+  const first  = ctosArr[0]
+  const endFull = [first?.endereco, first?.numero].filter(Boolean).join(', ')
+  const colors  = { 'Ativa': '#22c55e', 'Em manutenção': '#f59e0b', 'Danificada': '#ef4444', 'Desconhecida': '#6b7280' }
+
+  const floors = ctosArr.map(c => {
+    const sc = colors[c.status] || '#6b7280'
+    const andar = c.andar ? `${c.andar}º andar` : 'Andar —'
+    const comp  = c.complemento ? ` · ${c.complemento}` : ''
+    return `
+      <div class="bld-floor-row" onclick="showCtoDetails('${key}','${c.id}')">
+        <span class="bld-floor-dot" style="background:${sc}"></span>
+        <div class="bld-floor-info">
+          <span class="bld-floor-andar">${escHtml(andar)}${escHtml(comp)}</span>
+          <span class="bld-floor-area">${escHtml(c.area_cabo || '—')}${c.sp ? ' · SP: ' + escHtml(c.sp) : ''}</span>
+        </div>
+        <span class="bld-floor-status" style="color:${sc}">${escHtml(c.status)}</span>
+      </div>`
+  }).join('')
+
+  return `
+    <div class="popup">
+      <div class="popup-nome"><i class="ph ph-building" style="vertical-align:-2px"></i> Prédio FTTA</div>
+      ${endFull ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml(endFull)}${first?.bairro ? ' — ' + escHtml(first.bairro) : ''}</div>` : ''}
+      <div class="bld-floors">
+        <div class="bld-floors-title">🏢 ${ctosArr.length} CTO${ctosArr.length !== 1 ? 's' : ''} cadastrada${ctosArr.length !== 1 ? 's' : ''}</div>
+        ${floors}
+      </div>
+    </div>`
+}
+
+window.showCtoDetails = (key, ctoId) => {
+  const bm  = buildingMarkers[key]
+  const row = ctoData[ctoId]
+  if (!bm || !row) return
+  const back = `<button onclick="showBuildingPopup('${key}')" class="bld-back-btn">← Voltar ao prédio</button>`
+  bm.setPopupContent(buildPopupHTML(row) + back)
+}
+
+window.showBuildingPopup = (key) => {
+  const bm = buildingMarkers[key]
+  if (!bm) return
+  bm.setPopupContent(buildBuildingPopupHTML(key))
+}
+
+function upsertBuildingMarker(key) {
+  const group   = buildingGroups[key]
+  if (!group || !group.ctos.length) return
+  const ctosArr = group.ctos.map(id => ctoData[id]).filter(Boolean)
+
+  if (buildingMarkers[key]) clusterGroup.removeLayer(buildingMarkers[key])
+
+  const m = L.marker([group.lat, group.lng], { icon: makeBuildingIcon(ctosArr) })
+    .bindPopup(buildBuildingPopupHTML(key))
+  m._buildingKey = key
+  buildingMarkers[key] = m
+  clusterGroup.addLayer(m)
+}
+
 function addMarker(row) {
   ctoData[row.id] = row
-  const icon = (alertasCount[row.id] || 0) > 0 ? makeIconAlerta(row.status, row) : makeIcon(row.status, row)
-  const m = L.marker([row.lat, row.lng], { icon }).bindPopup(buildPopupHTML(row))
-  m._ctoId = row.id
-  markers[row.id] = m
-  if (activeFilters.has(row.status)) clusterGroup.addLayer(m)
+
+  if (row.ftta) {
+    const key = getBuildingKey(row)
+    if (!buildingGroups[key]) buildingGroups[key] = { lat: row.lat, lng: row.lng, ctos: [] }
+    if (!buildingGroups[key].ctos.includes(row.id)) buildingGroups[key].ctos.push(row.id)
+    upsertBuildingMarker(key)
+  } else {
+    const icon = (alertasCount[row.id] || 0) > 0 ? makeIconAlerta(row.status, row) : makeIcon(row.status, row)
+    const m = L.marker([row.lat, row.lng], { icon }).bindPopup(buildPopupHTML(row))
+    m._ctoId = row.id
+    markers[row.id] = m
+    if (activeFilters.has(row.status)) clusterGroup.addLayer(m)
+  }
   upsertListItem(row)
   if (isAdmin) { upsertTodasItem(row); upsertAtividadeItem(row) }
 }
@@ -657,7 +765,21 @@ function addMarkerPendente(row) {
 }
 
 function removeMarker(id) {
-  if (markers[id]) { clusterGroup.removeLayer(markers[id]); delete markers[id] }
+  const row = ctoData[id]
+  if (row && row.ftta) {
+    const key = getBuildingKey(row)
+    if (buildingGroups[key]) {
+      buildingGroups[key].ctos = buildingGroups[key].ctos.filter(x => x !== id)
+      if (buildingGroups[key].ctos.length === 0) {
+        if (buildingMarkers[key]) { clusterGroup.removeLayer(buildingMarkers[key]); delete buildingMarkers[key] }
+        delete buildingGroups[key]
+      } else {
+        upsertBuildingMarker(key)
+      }
+    }
+  } else {
+    if (markers[id]) { clusterGroup.removeLayer(markers[id]); delete markers[id] }
+  }
   delete ctoData[id]
 }
 
@@ -812,6 +934,7 @@ document.getElementById('form-cto').onsubmit = async (e) => {
 
   btn.disabled = true; btn.textContent = 'Salvando…'
 
+  const ftta = document.getElementById('f-ftta')?.checked || false
   const { error } = await sb.from(TABLE).insert({
     endereco:         endereco,
     numero:           numero,
@@ -824,6 +947,9 @@ document.getElementById('form-cto').onsubmit = async (e) => {
     lng:              pendingLatLng.lng,
     status_aprovacao: isAdmin ? 'aprovado' : 'pendente',
     submetido_por:    currentUser?.email || '',
+    ftta:             ftta,
+    andar:            ftta ? (document.getElementById('f-andar')?.value.trim() || null) : null,
+    complemento:      ftta ? (document.getElementById('f-complemento')?.value.trim() || null) : null,
   })
 
   btn.disabled = false; btn.textContent = 'Salvar'
@@ -926,6 +1052,15 @@ window.focusMarker = (id) => {
 }
 
 // ── Modal ─────────────────────────────────────────────────────
+window.toggleFttaFields = function(checked) {
+  const el = document.getElementById('ftta-fields')
+  if (el) el.style.display = checked ? 'block' : 'none'
+}
+window.toggleEditFttaFields = function(checked) {
+  const el = document.getElementById('edit-ftta-fields')
+  if (el) el.style.display = checked ? 'block' : 'none'
+}
+
 function openModal() {
   document.getElementById('f-endereco').value  = ''
   document.getElementById('f-numero').value    = ''
@@ -934,6 +1069,13 @@ function openModal() {
   document.getElementById('f-sp').value        = ''
   document.getElementById('f-sec').value       = ''
   document.getElementById('f-status').value    = 'Ativa'
+  // Reset FTTA
+  const fttaChk = document.getElementById('f-ftta')
+  if (fttaChk) fttaChk.checked = false
+  if (document.getElementById('f-andar')) document.getElementById('f-andar').value = ''
+  if (document.getElementById('f-complemento')) document.getElementById('f-complemento').value = ''
+  const fttaFields = document.getElementById('ftta-fields')
+  if (fttaFields) fttaFields.style.display = 'none'
   setGeocodeMsg('', '')
   document.getElementById('modal').style.display = 'flex'
   document.getElementById('f-endereco').focus()
@@ -1386,6 +1528,14 @@ window.editCto = function (id) {
   document.getElementById('edit-status-aprovacao').value    = row.status_aprovacao || 'pendente'
   document.getElementById('edit-msg').textContent           = ''
   document.getElementById('edit-msg').className             = 'geocode-msg'
+  // FTTA fields
+  const editFttaChk = document.getElementById('edit-ftta')
+  if (editFttaChk) {
+    editFttaChk.checked = !!row.ftta
+    window.toggleEditFttaFields(!!row.ftta)
+  }
+  if (document.getElementById('edit-andar')) document.getElementById('edit-andar').value = row.andar || ''
+  if (document.getElementById('edit-complemento')) document.getElementById('edit-complemento').value = row.complemento || ''
   document.getElementById('modal-edit').style.display      = 'flex'
 }
 
@@ -1414,6 +1564,9 @@ function initAdminPanel() {
       sec:              document.getElementById('edit-sec').value.trim(),
       status:           document.getElementById('edit-status').value,
       status_aprovacao: document.getElementById('edit-status-aprovacao').value,
+      ftta:             document.getElementById('edit-ftta')?.checked || false,
+      andar:            document.getElementById('edit-ftta')?.checked ? (document.getElementById('edit-andar')?.value.trim() || null) : null,
+      complemento:      document.getElementById('edit-ftta')?.checked ? (document.getElementById('edit-complemento')?.value.trim() || null) : null,
     }).eq('id', id)
     btn.disabled = false; btn.textContent = 'Salvar'
     if (error) {
