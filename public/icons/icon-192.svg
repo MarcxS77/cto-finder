@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="40" fill="#060f07"/>
+  <rect x="8" y="8" width="176" height="176" rx="34" fill="none" stroke="#39ff14" stroke-width="4"/>
+  <text x="96" y="110" text-anchor="middle" font-size="80" font-family="monospace" fill="#39ff14">CTO</text>
+</svg>

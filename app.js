@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
+import { queueCto, getPendingCtos, removePendingCto, getPendingCount } from './src/offline-queue.js'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_KEY
@@ -144,6 +145,7 @@ async function handleSession(session) {
     if (!mapInitialized) {
       initMap()
       initSearch()
+      initOffline()
       makeDraggable(document.getElementById('painel'),       true)
       makeDraggable(document.getElementById('painel-admin'), false)
       mapInitialized = true
@@ -350,6 +352,46 @@ function getBuildingKey(row) {
   const num = (row.numero   || '').toLowerCase().trim()
   const bai = (row.bairro   || '').toLowerCase().trim()
   return `${end}|${num}|${bai}`
+}
+
+// ── Offline / PWA ─────────────────────────────────────────────
+function initOffline() {
+  const banner = document.getElementById('offline-banner')
+
+  function updateStatus() {
+    const online = navigator.onLine
+    if (banner) banner.style.display = online ? 'none' : 'flex'
+    if (online) syncOfflineQueue()
+  }
+
+  window.addEventListener('online',  updateStatus)
+  window.addEventListener('offline', updateStatus)
+  updateStatus()
+}
+
+async function syncOfflineQueue() {
+  if (!sb || !currentUser) return
+  const pending = await getPendingCtos()
+  if (!pending.length) return
+
+  const badge = document.getElementById('offline-sync-badge')
+  if (badge) { badge.textContent = `⏫ Sincronizando ${pending.length} CTO${pending.length > 1 ? 's' : ''}…`; badge.style.display = 'flex' }
+
+  let synced = 0
+  for (const item of pending) {
+    const { localId, _queuedAt, ...payload } = item
+    const { data, error } = await sb.from(TABLE).insert(payload).select().single()
+    if (!error) {
+      await removePendingCto(localId)
+      if (data) window._applyChange?.('INSERT', data)
+      synced++
+    }
+  }
+
+  if (badge) {
+    badge.textContent = `✅ ${synced} CTO${synced > 1 ? 's' : ''} sincronizada${synced > 1 ? 's' : ''}!`
+    setTimeout(() => { badge.style.display = 'none' }, 3500)
+  }
 }
 
 function initMap() {
@@ -1016,8 +1058,8 @@ document.getElementById('form-cto').onsubmit = async (e) => {
 
   btn.disabled = true; btn.textContent = 'Salvando…'
 
-  const ftta = document.getElementById('f-ftta')?.checked || false
-  const { data: inserted, error } = await sb.from(TABLE).insert({
+  const ftta    = document.getElementById('f-ftta')?.checked || false
+  const payload = {
     endereco:         endereco,
     numero:           numero,
     bairro:           bairro,
@@ -1032,9 +1074,25 @@ document.getElementById('form-cto').onsubmit = async (e) => {
     ftta:             ftta,
     andar:            ftta ? (document.getElementById('f-andar')?.value.trim() || null) : null,
     complemento:      ftta ? (document.getElementById('f-complemento')?.value.trim() || null) : null,
-  }).select().single()
+  }
 
   btn.disabled = false; btn.textContent = 'Salvar'
+
+  // ── Modo offline: enfileira localmente ────────────────────────
+  if (!navigator.onLine) {
+    await queueCto(payload)
+    closeModal()
+    const count = await getPendingCount()
+    const badge = document.getElementById('offline-sync-badge')
+    if (badge) {
+      badge.textContent = `📦 ${count} CTO${count > 1 ? 's' : ''} salva${count > 1 ? 's' : ''} offline — sincronizará quando houver internet`
+      badge.style.display = 'flex'
+    }
+    return
+  }
+
+  // ── Modo online: envia normalmente ────────────────────────────
+  const { data: inserted, error } = await sb.from(TABLE).insert(payload).select().single()
 
   if (error) {
     alert('Erro ao salvar: ' + error.message)
@@ -1042,7 +1100,6 @@ document.getElementById('form-cto').onsubmit = async (e) => {
     if (inserted) window._applyChange('INSERT', inserted)
     closeModal()
     if (!isAdmin) {
-      // Mostra mensagem de análise para usuários comuns
       const hint = document.getElementById('hint')
       hint.textContent = '✅ CTO enviada para análise — aguarde aprovação do administrador'
       hint.style.color = '#4ade80'

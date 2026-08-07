@@ -449,6 +449,40 @@ body {
 }
 .fab.loading { opacity: 0.6; pointer-events: none; }
 
+/* ── PWA Offline ── */
+#offline-banner {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9000;
+  background: #78350f;
+  border-bottom: 1px solid #f59e0b;
+  color: #fcd34d;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  text-align: center;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+#offline-sync-badge {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9000;
+  background: rgba(6,15,7,0.95);
+  border: 1px solid #39ff14;
+  border-radius: 20px;
+  color: #86efac;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 16px;
+  white-space: nowrap;
+  box-shadow: 0 0 14px rgba(57,255,20,0.3);
+}
+
 /* Hint */
 #hint {
   position: fixed;
