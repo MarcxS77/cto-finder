@@ -394,13 +394,37 @@ function initMap() {
     if (!navigator.geolocation) return alert('GPS não disponível.')
     document.getElementById('btn-gps').classList.add('loading')
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         document.getElementById('btn-gps').classList.remove('loading')
         const ll = L.latLng(pos.coords.latitude, pos.coords.longitude)
-        map.flyTo(ll, 17)
+        map.flyTo(ll, 18)
         pendingLatLng = ll
         placeTempMarker(ll)
         openModal()
+
+        // Geocodificação reversa — preenche rua e bairro automaticamente
+        if (MAPBOX_TOKEN) {
+          setGeocodeMsg('📍 Detectando endereço…', '')
+          try {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${ll.lng},${ll.lat}.json?access_token=${MAPBOX_TOKEN}&language=pt&types=address&limit=1`
+            const res  = await fetch(url)
+            const data = await res.json()
+            const feat = data.features?.[0]
+            if (feat) {
+              const { rua, bairro } = parseMapboxFeature(feat)
+              // Extrai número do place_name se disponível
+              const numMatch = feat.place_name.match(/^(\d+[A-Za-z]?)/)
+              if (rua) document.getElementById('f-endereco').value = rua
+              if (bairro) document.getElementById('f-bairro').value = bairro
+              if (numMatch) document.getElementById('f-numero').value = numMatch[1]
+              setGeocodeMsg('✓ Endereço detectado automaticamente', 'success')
+            } else {
+              setGeocodeMsg('⚠ Endereço não encontrado — preencha manualmente', '')
+            }
+          } catch {
+            setGeocodeMsg('⚠ Falha ao detectar endereço', '')
+          }
+        }
       },
       () => {
         document.getElementById('btn-gps').classList.remove('loading')
