@@ -717,18 +717,32 @@ function buildBuildingPopupHTML(key) {
     </div>`
 }
 
+function setPopupNoFlicker(bm, html) {
+  // Atualiza conteúdo sem fechar/reabrir o popup
+  const popup = bm.getPopup()
+  if (popup && map.hasLayer(popup)) {
+    popup.setContent(html)
+    popup.update()
+  } else {
+    bm.setPopupContent(html)
+    bm.openPopup()
+  }
+}
+
 window.showCtoDetails = (key, ctoId) => {
   const bm  = buildingMarkers[key]
   const row = ctoData[ctoId]
   if (!bm || !row) return
   const back = `<button onclick="showBuildingPopup('${key}')" class="bld-back-btn">← Voltar ao prédio</button>`
-  bm.setPopupContent(buildPopupHTML(row) + back)
+  setPopupNoFlicker(bm, buildPopupHTML(row) + back)
+  // Carrega comentários manualmente (evento popupopen não dispara no update)
+  setTimeout(() => loadComentarios(ctoId), 50)
 }
 
 window.showBuildingPopup = (key) => {
   const bm = buildingMarkers[key]
   if (!bm) return
-  bm.setPopupContent(buildBuildingPopupHTML(key))
+  setPopupNoFlicker(bm, buildBuildingPopupHTML(key))
 }
 
 window.addAndar = (key) => {
@@ -1094,11 +1108,27 @@ window.changeStatus = async (id, newStatus) => {
 }
 
 window.focusMarker = (id) => {
-  const m = markers[id]
-  if (!m) return
   document.getElementById('painel').classList.remove('open')
   document.getElementById('painel-admin').classList.remove('open')
-  clusterGroup.zoomToShowLayer(m, () => setTimeout(() => m.openPopup(), 300))
+
+  const row = ctoData[id]
+  if (row && row.ftta) {
+    // CTO FTTA — foca o building marker e abre direto no andar
+    const key = getBuildingKey(row)
+    const bm  = buildingMarkers[key]
+    if (!bm) return
+    clusterGroup.zoomToShowLayer(bm, () => {
+      setTimeout(() => {
+        bm.openPopup()
+        // Após popup abrir, vai direto para o andar selecionado
+        setTimeout(() => showCtoDetails(key, id), 50)
+      }, 300)
+    })
+  } else {
+    const m = markers[id]
+    if (!m) return
+    clusterGroup.zoomToShowLayer(m, () => setTimeout(() => m.openPopup(), 300))
+  }
 }
 
 // ── Modal ─────────────────────────────────────────────────────
