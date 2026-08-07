@@ -349,7 +349,6 @@ function initMap() {
     zoomOffset: MAPBOX_TOKEN ? -1  : 0,
     maxZoom: 22,
   }).addTo(map)
-  L.control.zoom({ position: 'bottomright' }).addTo(map)
 
   // Cluster de markers
   clusterGroup = L.markerClusterGroup({
