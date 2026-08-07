@@ -1914,3 +1914,27 @@ body {
   text-align: center;
 }
 .bld-back-btn:hover { border-color: #39ff14; color: #39ff14; }
+
+.bld-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(57,255,20,0.07);
+  border: 1.5px dashed #39ff14;
+  border-radius: 8px;
+  color: #39ff14;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bld-add-btn:hover { background: rgba(57,255,20,0.15); }
+.bld-add-pending-note {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 400;
+}

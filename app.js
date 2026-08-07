@@ -333,6 +333,8 @@ function makeDraggable(panelEl, fromLeft) {
 //  MAPA
 // ══════════════════════════════════════
 let map, clusterGroup, markers = {}, pendingLatLng = null, tempMarker = null, ctoData = {}
+let fttaBuildingKey = null   // key do prédio quando cadastrando novo andar
+let fttaAutoApprove = false  // true se o prédio já tem CTO aprovada
 const activeFilters = new Set(['Ativa', 'Em manutenção', 'Danificada', 'Desconhecida'])
 
 // Agrupamento de prédios FTTA
@@ -696,6 +698,13 @@ function buildBuildingPopupHTML(key) {
       </div>`
   }).join('')
 
+  const hasApproved = ctosArr.some(c => c.status_aprovacao === 'aprovado')
+  const addBtn = `
+    <button class="bld-add-btn" onclick="addAndar('${key}')">
+      <i class="ph ph-plus-circle"></i> Adicionar andar
+      ${hasApproved ? '' : '<span class="bld-add-pending-note">aguarda 1ª aprovação</span>'}
+    </button>`
+
   return `
     <div class="popup">
       <div class="popup-nome"><i class="ph ph-building" style="vertical-align:-2px"></i> Prédio FTTA</div>
@@ -704,6 +713,7 @@ function buildBuildingPopupHTML(key) {
         <div class="bld-floors-title">🏢 ${ctosArr.length} CTO${ctosArr.length !== 1 ? 's' : ''} cadastrada${ctosArr.length !== 1 ? 's' : ''}</div>
         ${floors}
       </div>
+      ${addBtn}
     </div>`
 }
 
@@ -719,6 +729,46 @@ window.showBuildingPopup = (key) => {
   const bm = buildingMarkers[key]
   if (!bm) return
   bm.setPopupContent(buildBuildingPopupHTML(key))
+}
+
+window.addAndar = (key) => {
+  const group = buildingGroups[key]
+  if (!group) return
+  const ctosArr   = group.ctos.map(id => ctoData[id]).filter(Boolean)
+  const hasApproved = ctosArr.some(c => c.status_aprovacao === 'aprovado')
+  const ref       = ctosArr[0]
+
+  // Fecha o popup antes de abrir o modal
+  map.closePopup()
+
+  // Guarda contexto para o form submit
+  fttaBuildingKey = key
+  fttaAutoApprove = hasApproved
+
+  // Abre e pré-preenche o modal
+  openModal()
+  if (ref) {
+    document.getElementById('f-endereco').value = ref.endereco || ''
+    document.getElementById('f-numero').value   = ref.numero   || ''
+    document.getElementById('f-bairro').value   = ref.bairro   || ''
+    // Reutiliza coords do prédio
+    pendingLatLng = L.latLng(group.lat, group.lng)
+    placeTempMarker(pendingLatLng)
+    map.setView(pendingLatLng, map.getZoom())
+  }
+
+  // Ativa FTTA automaticamente
+  const fttaChk = document.getElementById('f-ftta')
+  if (fttaChk) { fttaChk.checked = true; window.toggleFttaFields(true) }
+  document.getElementById('f-andar')?.focus()
+
+  // Mostra badge de auto-aprovação no modal se aplicável
+  const geocodeMsg = document.getElementById('geocode-msg') || document.querySelector('.geocode-msg')
+  if (hasApproved) {
+    setGeocodeMsg('✓ Prédio já aprovado — novo andar será aprovado automaticamente', 'success')
+  } else {
+    setGeocodeMsg('⚠️ Aguardando aprovação da primeira CTO deste prédio', '')
+  }
 }
 
 function upsertBuildingMarker(key) {
@@ -945,7 +995,7 @@ document.getElementById('form-cto').onsubmit = async (e) => {
     status:           document.getElementById('f-status').value,
     lat:              pendingLatLng.lat,
     lng:              pendingLatLng.lng,
-    status_aprovacao: isAdmin ? 'aprovado' : 'pendente',
+    status_aprovacao: (isAdmin || fttaAutoApprove) ? 'aprovado' : 'pendente',
     submetido_por:    currentUser?.email || '',
     ftta:             ftta,
     andar:            ftta ? (document.getElementById('f-andar')?.value.trim() || null) : null,
@@ -1085,6 +1135,8 @@ function closeModal() {
   document.getElementById('modal').style.display = 'none'
   pendingLatLng = null
   if (tempMarker) { tempMarker.remove(); tempMarker = null }
+  fttaBuildingKey = null
+  fttaAutoApprove = false
 }
 
 document.getElementById('btn-cancelar').onclick   = closeModal
