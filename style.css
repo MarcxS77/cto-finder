@@ -401,7 +401,7 @@ body {
 /* Botões flutuantes */
 .fab-group {
   position: fixed;
-  bottom: 90px;
+  bottom: 24px;
   right: 14px;
   z-index: 800;
   display: flex;
@@ -1242,29 +1242,49 @@ body {
 /* Legenda */
 #legenda {
   position: fixed;
-  bottom: 20px;
+  bottom: 24px;
   left: 14px;
   z-index: 800;
-  background: rgba(6, 15, 7, 0.92);
-  backdrop-filter: blur(6px);
-  border: 1px solid #0d2a12;
-  border-radius: 10px;
-  padding: 10px 14px;
   font-size: 11px;
   color: #94a3b8;
 }
-#legenda .leg-title {
-  font-weight: 700;
+#btn-legenda {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(6,15,7,0.88);
+  border: 1.5px solid #1a3a20;
+  border-radius: 20px;
+  padding: 7px 14px;
   color: #86efac;
-  margin-bottom: 6px;
   font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
 }
+#btn-legenda:hover { border-color: #39ff14; box-shadow: 0 0 10px rgba(57,255,20,0.2); }
+#btn-legenda #leg-icon { font-size: 8px; color: #39ff14; }
+#leg-content {
+  display: none;
+  background: rgba(6,15,7,0.92);
+  border: 1px solid #1a3a20;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 6px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+}
+#leg-content.open { display: block; }
 #legenda .leg-row {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 4px;
 }
+#legenda .leg-row:last-child { margin-bottom: 0; }
 #legenda .leg-dot {
   width: 9px;
   height: 9px;

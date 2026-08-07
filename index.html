@@ -105,11 +105,15 @@
   <div id="hint" style="display:none">Toque no mapa ou use 📍 para registrar uma CTO</div>
 
   <div id="legenda">
-    <div class="leg-title">Legenda</div>
-    <div class="leg-row"><div class="leg-dot" style="background:#22c55e"></div> Ativa</div>
-    <div class="leg-row"><div class="leg-dot" style="background:#f59e0b"></div> Em manutenção</div>
-    <div class="leg-row"><div class="leg-dot" style="background:#ef4444"></div> Danificada</div>
-    <div class="leg-row"><div class="leg-dot" style="background:#6b7280"></div> Desconhecida</div>
+    <button id="btn-legenda" onclick="toggleLegenda()" title="Legenda">
+      <span id="leg-icon">●</span> Legenda
+    </button>
+    <div id="leg-content">
+      <div class="leg-row"><div class="leg-dot" style="background:#22c55e"></div> Ativa</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#f59e0b"></div> Em manutenção</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#ef4444"></div> Danificada</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#6b7280"></div> Desconhecida</div>
+    </div>
   </div>
 
   <div id="modal">

@@ -38,6 +38,10 @@ let mapInitialized  = false
 let currentUser     = null
 let isAdmin         = false
 
+window.toggleLegenda = function () {
+  document.getElementById('leg-content').classList.toggle('open')
+}
+
 window.switchTab = function (tab) {
   currentTab = tab
   document.getElementById('tab-login').classList.toggle('active', tab === 'login')
