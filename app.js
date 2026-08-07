@@ -377,6 +377,11 @@ function initMap() {
 
   map.on('click', (e) => {
     if (document.getElementById('modal').style.display === 'flex') return
+    // Se há popup aberto, apenas fecha — não abre modal de cadastro
+    if (map.hasLayer && document.querySelector('.leaflet-popup')) {
+      map.closePopup()
+      return
+    }
     pendingLatLng = e.latlng
     placeTempMarker(e.latlng)
     openModal()
