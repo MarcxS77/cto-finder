@@ -17,6 +17,7 @@
 </div>
 
 <div id="login-screen" style="display:none">
+  <canvas id="dot-matrix-bg"></canvas>
   <div class="login-card">
 
     <div class="login-logo">
@@ -277,5 +278,78 @@
 
 <!-- Vite injeta o JS automaticamente como módulo -->
 <script type="module" src="/app.js"></script>
+
+<!-- Dot Matrix background (login) -->
+<script>
+;(function () {
+  const canvas = document.getElementById('dot-matrix-bg')
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+
+  const SPACING = 24   // distância entre pontos
+  const R_BASE  = 1.2  // raio mínimo
+  const R_MAX   = 2.2  // raio máximo
+  const SPEED   = 0.00055
+
+  // Ruído procedural multi-frequência (imita Perlin/Simplex)
+  function noise(x, y, t) {
+    return (
+      Math.sin(x * 0.50 + t * 2.30) * 0.28 +
+      Math.sin(y * 0.38 + t * 1.80) * 0.26 +
+      Math.sin((x - y) * 0.22 + t * 1.40) * 0.22 +
+      Math.cos(x * 0.14 + y * 0.19 + t * 1.10) * 0.14 +
+      Math.sin(x * 0.08 - y * 0.06 + t * 0.70) * 0.10
+    ) // resultado ≈ -1 … 1
+  }
+
+  let t = 0, raf = null
+
+  function resize() {
+    canvas.width  = window.innerWidth
+    canvas.height = window.innerHeight
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    const cols = Math.ceil(canvas.width  / SPACING) + 2
+    const rows = Math.ceil(canvas.height / SPACING) + 2
+
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const x = i * SPACING
+        const y = j * SPACING
+        const n = noise(i * 0.6, j * 0.6, t)       // -1…1
+        const a = (n + 1) / 2                        // 0…1
+        const alpha = a * 0.65                       // max 65 % opacidade
+        const r     = R_BASE + (R_MAX - R_BASE) * a
+
+        ctx.beginPath()
+        ctx.arc(x, y, r, 0, Math.PI * 2)
+        // gradiente de cor: verde neon brilhante → verde mais escuro
+        const g = Math.round(180 + 75 * a)           // 180–255
+        ctx.fillStyle = `rgba(0,${g},${Math.round(20 * a)},${alpha})`
+        ctx.fill()
+      }
+    }
+
+    t += SPEED
+    raf = requestAnimationFrame(draw)
+  }
+
+  // Pausa quando login some, retoma quando aparece
+  const observer = new MutationObserver(() => {
+    const visible = document.getElementById('login-screen').style.display !== 'none'
+    if (visible && !raf) { resize(); draw() }
+    if (!visible && raf) { cancelAnimationFrame(raf); raf = null }
+  })
+  observer.observe(document.getElementById('login-screen'), { attributes: true, attributeFilter: ['style'] })
+
+  window.addEventListener('resize', resize)
+  resize()
+  // Inicia se o login já estiver visível
+  if (document.getElementById('login-screen').style.display !== 'none') draw()
+})()
+</script>
 </body>
 </html>
