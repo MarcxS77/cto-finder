@@ -771,9 +771,13 @@ window.addAndar = (key) => {
     map.setView(pendingLatLng, map.getZoom())
   }
 
-  // Ativa FTTA automaticamente
+  // Ativa e bloqueia FTTA automaticamente
   const fttaChk = document.getElementById('f-ftta')
-  if (fttaChk) { fttaChk.checked = true; window.toggleFttaFields(true) }
+  if (fttaChk) {
+    fttaChk.checked  = true
+    fttaChk.disabled = true
+    window.toggleFttaFields(true)
+  }
   document.getElementById('f-andar')?.focus()
 
   // Mostra badge de auto-aprovação no modal se aplicável
@@ -1167,6 +1171,9 @@ function closeModal() {
   if (tempMarker) { tempMarker.remove(); tempMarker = null }
   fttaBuildingKey = null
   fttaAutoApprove = false
+  // Desbloqueia checkbox caso tenha sido travado no "Adicionar andar"
+  const fttaChk = document.getElementById('f-ftta')
+  if (fttaChk) fttaChk.disabled = false
 }
 
 document.getElementById('btn-cancelar').onclick   = closeModal
