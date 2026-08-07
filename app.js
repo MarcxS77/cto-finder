@@ -555,38 +555,48 @@ async function loadCtos() {
   })
   if (isAdmin) updatePendenteCount()
 
-  sb.channel('ctos-rt')
-    .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, (payload) => {
-      const row = payload.new || payload.old
+  // ── Função central de atualização de UI ─────────────────────
+  // Chamada tanto pelo Realtime quanto imediatamente após ações locais
+  const _seenIds = new Set()  // evita dupla aplicação se Realtime também disparar
+  window._applyChange = (eventType, row) => {
+    const dedupKey = `${eventType}:${row.id}:${row.updated_at || row.criado || ''}`
+    if (_seenIds.has(dedupKey)) return
+    _seenIds.add(dedupKey)
+    setTimeout(() => _seenIds.delete(dedupKey), 3000)
 
-      if (payload.eventType === 'INSERT') {
-        if (row.status_aprovacao === 'aprovado') {
-          addMarker(row)
-        } else if (isAdmin) {
-          addMarkerPendente(row)
-          upsertPendenteItem(row)
-          updatePendenteCount()
-        }
-      } else if (payload.eventType === 'UPDATE') {
-        removeMarker(row.id)
-        removeListItem(row.id)
-        removePendenteItem(row.id)
-        removeTodasItem(row.id)
-        removeAtividadeItem(row.id)
-        if (row.status_aprovacao === 'aprovado') {
-          addMarker(row)
-        } else if (isAdmin && row.status_aprovacao === 'pendente') {
-          addMarkerPendente(row)
-        }
-        updatePendenteCount()
-      } else if (payload.eventType === 'DELETE') {
-        removeMarker(row.id)
-        removeListItem(row.id)
-        removePendenteItem(row.id)
-        removeTodasItem(row.id)
-        removeAtividadeItem(row.id)
+    if (eventType === 'INSERT') {
+      if (row.status_aprovacao === 'aprovado') {
+        addMarker(row)
+      } else if (isAdmin) {
+        addMarkerPendente(row)
+        upsertPendenteItem(row)
         updatePendenteCount()
       }
+    } else if (eventType === 'UPDATE') {
+      removeMarker(row.id)
+      removeListItem(row.id)
+      removePendenteItem(row.id)
+      removeTodasItem(row.id)
+      removeAtividadeItem(row.id)
+      if (row.status_aprovacao === 'aprovado') {
+        addMarker(row)
+      } else if (isAdmin && row.status_aprovacao === 'pendente') {
+        addMarkerPendente(row)
+      }
+      updatePendenteCount()
+    } else if (eventType === 'DELETE') {
+      removeMarker(row.id)
+      removeListItem(row.id)
+      removePendenteItem(row.id)
+      removeTodasItem(row.id)
+      removeAtividadeItem(row.id)
+      updatePendenteCount()
+    }
+  }
+
+  sb.channel('ctos-rt')
+    .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, (payload) => {
+      window._applyChange(payload.eventType, payload.new || payload.old)
     })
     .subscribe()
 }
@@ -1003,7 +1013,7 @@ document.getElementById('form-cto').onsubmit = async (e) => {
   btn.disabled = true; btn.textContent = 'Salvando…'
 
   const ftta = document.getElementById('f-ftta')?.checked || false
-  const { error } = await sb.from(TABLE).insert({
+  const { data: inserted, error } = await sb.from(TABLE).insert({
     endereco:         endereco,
     numero:           numero,
     bairro:           bairro,
@@ -1018,13 +1028,14 @@ document.getElementById('form-cto').onsubmit = async (e) => {
     ftta:             ftta,
     andar:            ftta ? (document.getElementById('f-andar')?.value.trim() || null) : null,
     complemento:      ftta ? (document.getElementById('f-complemento')?.value.trim() || null) : null,
-  })
+  }).select().single()
 
   btn.disabled = false; btn.textContent = 'Salvar'
 
   if (error) {
     alert('Erro ao salvar: ' + error.message)
   } else {
+    if (inserted) window._applyChange('INSERT', inserted)
     closeModal()
     if (!isAdmin) {
       // Mostra mensagem de análise para usuários comuns
@@ -1084,30 +1095,36 @@ async function loadHistorico() {
 
 // ── Aprovar / Rejeitar (admin) ────────────────────────────────
 window.aprovarCto = async (id) => {
-  await sb.from(TABLE).update({ status_aprovacao: 'aprovado' }).eq('id', id)
+  const { data: updated } = await sb.from(TABLE).update({ status_aprovacao: 'aprovado' }).eq('id', id).select().single()
   logHistorico(id, 'aprovou')
+  if (updated) window._applyChange('UPDATE', updated)
   map.closePopup()
   document.getElementById('painel-admin').classList.remove('open')
 }
 
 window.rejeitarCto = async (id) => {
   if (!confirm('Rejeitar e remover esta CTO?')) return
+  const row = { ...ctoData[id], id }
   logHistorico(id, 'rejeitou')
   await sb.from(TABLE).delete().eq('id', id)
+  window._applyChange('DELETE', row)
   map.closePopup()
 }
 
 window.deleteCto = async (id) => {
   if (!confirm('Remover esta CTO?')) return
+  const row = { ...ctoData[id], id }
   logHistorico(id, 'removeu')
   await sb.from(TABLE).delete().eq('id', id)
+  window._applyChange('DELETE', row)
   map.closePopup()
 }
 
 window.changeStatus = async (id, newStatus) => {
   const oldStatus = ctoData[id]?.status
-  await sb.from(TABLE).update({ status: newStatus }).eq('id', id)
+  const { data: updated } = await sb.from(TABLE).update({ status: newStatus }).eq('id', id).select().single()
   logHistorico(id, 'mudou status', { de: oldStatus, para: newStatus })
+  if (updated) window._applyChange('UPDATE', updated)
   map.closePopup()
 }
 
@@ -1644,7 +1661,7 @@ function initAdminPanel() {
     const id  = document.getElementById('edit-id').value
     const btn = salvar
     btn.disabled = true; btn.textContent = 'Salvando…'
-    const { error } = await sb.from(TABLE).update({
+    const { data: updated, error } = await sb.from(TABLE).update({
       endereco:         document.getElementById('edit-endereco').value.trim(),
       numero:           document.getElementById('edit-numero').value.trim(),
       bairro:           document.getElementById('edit-bairro').value.trim(),
@@ -1656,7 +1673,7 @@ function initAdminPanel() {
       ftta:             document.getElementById('edit-ftta')?.checked || false,
       andar:            document.getElementById('edit-ftta')?.checked ? (document.getElementById('edit-andar')?.value.trim() || null) : null,
       complemento:      document.getElementById('edit-ftta')?.checked ? (document.getElementById('edit-complemento')?.value.trim() || null) : null,
-    }).eq('id', id)
+    }).eq('id', id).select().single()
     btn.disabled = false; btn.textContent = 'Salvar'
     if (error) {
       const msg = document.getElementById('edit-msg')
@@ -1668,6 +1685,7 @@ function initAdminPanel() {
         status:   document.getElementById('edit-status').value,
         aprovacao: document.getElementById('edit-status-aprovacao').value,
       })
+      if (updated) window._applyChange('UPDATE', updated)
       document.getElementById('modal-edit').style.display = 'none'
     }
   }
@@ -1675,8 +1693,10 @@ function initAdminPanel() {
 
 window.deleteCtoAdmin = async (id) => {
   if (!confirm('Remover esta CTO permanentemente?')) return
+  const row = { ...ctoData[id], id }
   logHistorico(id, 'removeu')
   await sb.from(TABLE).delete().eq('id', id)
+  window._applyChange('DELETE', row)
 }
 
 // ── Painel lateral ────────────────────────────────────────────
