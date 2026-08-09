@@ -173,20 +173,34 @@ async function handleSession(session) {
 
 if (sb) {
   sb.auth.onAuthStateChange((event, session) => {
+    console.log('[Auth]', event, session?.user?.email ?? 'no session')
     handleSession(session)
   })
 }
 
-// Fallback: se OAuth travar por mais de 10s, desiste e mostra login
+// Fallback: se OAuth travar por mais de 10s, mostra login com aviso
 if (isOAuthRedirect) {
-  setTimeout(() => {
+  setTimeout(async () => {
     const loading = document.getElementById('loading-screen')
     if (loading && loading.style.display !== 'none') {
       sessionStorage.removeItem('oauth_pending')
       loading.style.display = 'none'
       document.getElementById('login-screen').style.display = 'flex'
+
+      // Tenta pegar a sessão manualmente — último recurso
+      if (sb) {
+        const { data, error } = await sb.auth.getSession()
+        console.log('[Auth fallback] getSession:', data?.session?.user?.email, error?.message)
+        if (data?.session) {
+          handleSession(data.session)
+          return
+        }
+        // Mostra mensagem de erro visível na tela de login
+        const msg = error?.message || 'Não foi possível autenticar. Tente novamente.'
+        showAuthMsg('⚠️ ' + msg, 'error')
+      }
     }
-  }, 10000)
+  }, 8000)
 }
 
 document.getElementById('btn-logout').onclick = () => { if (sb) sb.auth.signOut() }
