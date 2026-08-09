@@ -12,17 +12,17 @@ const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_TOKEN
 const TABLE         = 'ctos'
 const credenciaisOk = !!SUPABASE_URL && !!SUPABASE_KEY
 
-// Detecta redirect OAuth via sessionStorage (mais confiável que URL parsing)
+// Detecta redirect OAuth — PKCE usa ?code=, implicit usa #access_token
 const isOAuthRedirect = !!sessionStorage.getItem('oauth_pending') ||
                         window.location.hash.includes('access_token') ||
-                        window.location.search.includes('code=')
+                        window.location.search.includes('code=') ||
+                        window.location.search.includes('error=')
 
 let sb = null
 if (credenciaisOk) {
   try {
     sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
-        flowType: 'implicit',
         detectSessionInUrl: true,
         persistSession: true,
       }
