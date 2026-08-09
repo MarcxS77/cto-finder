@@ -127,6 +127,15 @@ async function handleSession(session) {
 
     // Verifica admin no banco — não no frontend
     try {
+      const meta = currentUser.user_metadata
+      // Upsert perfil com dados atuais do Google
+      await sb.from('profiles').upsert({
+        id:         currentUser.id,
+        full_name:  meta?.full_name  || meta?.name || null,
+        email:      currentUser.email,
+        avatar_url: meta?.avatar_url || null,
+      }, { onConflict: 'id', ignoreDuplicates: false })
+
       const { data: profile, error: profileErr } = await sb
         .from('profiles')
         .select('is_admin')
