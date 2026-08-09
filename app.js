@@ -1593,7 +1593,9 @@ async function loadUsuarios() {
   // Campo de busca
   const searchWrap = document.createElement('div')
   searchWrap.className = 'usuario-search-wrap'
-  searchWrap.innerHTML = `<input type="text" class="usuario-search-input" id="usuario-search" placeholder="🔍 Buscar por nome ou email…" />`
+  searchWrap.innerHTML = `
+    <input type="text" class="usuario-search-input" id="usuario-search" placeholder="🔍 Buscar por nome ou email…" />
+    <button class="usuario-admin-grant-btn" onclick="promptGrantAdmin()">🛡️ Tornar admin</button>`
   container.appendChild(searchWrap)
 
   const cardsWrap = document.createElement('div')
@@ -1627,16 +1629,49 @@ async function loadUsuarios() {
             : `<span>${escHtml(inicial)}</span>`}
         </div>
         <div class="usuario-info">
-          <div class="usuario-nome">${escHtml(nome)} ${isAdminUser ? '<span class="usuario-admin-badge">admin</span>' : ''}</div>
+          <div class="usuario-nome">${escHtml(nome)} ${isAdminUser ? '<span class="usuario-admin-badge">ADMIN</span>' : ''}</div>
           <div class="usuario-email">${escHtml(p.email || '—')}</div>
           <div class="usuario-meta">📅 ${dt} · 📦 ${ctos} CTO${ctos !== 1 ? 's' : ''}</div>
-        </div>`
+        </div>
+        <button class="usuario-toggle-admin ${isAdminUser ? 'is-admin' : ''}"
+          onclick="toggleAdmin('${p.id}', ${isAdminUser})"
+          title="${isAdminUser ? 'Remover admin' : 'Tornar admin'}">
+          ${isAdminUser ? '🛡️ Remover' : '🛡️ Admin'}
+        </button>`
       cardsWrap.appendChild(card)
     })
   }
 
   renderCards('')
   document.getElementById('usuario-search').addEventListener('input', (e) => renderCards(e.target.value))
+}
+
+window.promptGrantAdmin = async () => {
+  const email = prompt('Digite o email do usuário para tornar admin:')
+  if (!email) return
+  const { data, error } = await sb
+    .from('profiles')
+    .update({ is_admin: true })
+    .eq('email', email.trim().toLowerCase())
+    .select('id')
+  if (error || !data?.length) {
+    alert('Usuário não encontrado: ' + (error?.message || email))
+    return
+  }
+  alert(`✅ ${email} agora é admin!`)
+  loadUsuarios()
+}
+
+window.toggleAdmin = async (userId, atualIsAdmin) => {
+  const novoValor = !atualIsAdmin
+  const acao = novoValor ? 'Tornar admin' : 'Remover admin'
+  if (!confirm(`${acao} este usuário?`)) return
+  const { error } = await sb
+    .from('profiles')
+    .update({ is_admin: novoValor })
+    .eq('id', userId)
+  if (error) { alert('Erro: ' + error.message); return }
+  loadUsuarios()
 }
 
 // ── Lista "Todas as CTOs" (admin) ─────────────────────────────

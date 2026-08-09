@@ -1249,6 +1249,44 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+.usuario-admin-grant-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(57,255,20,0.07);
+  border: 1.5px dashed #39ff14;
+  border-radius: 8px;
+  color: #39ff14;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.usuario-admin-grant-btn:hover { background: rgba(57,255,20,0.15); }
+.usuario-toggle-admin {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #1a3a20;
+  background: #0d1a0e;
+  color: #64748b;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.usuario-toggle-admin:hover { border-color: #39ff14; color: #39ff14; }
+.usuario-toggle-admin.is-admin {
+  background: rgba(57,255,20,0.1);
+  border-color: rgba(57,255,20,0.4);
+  color: #39ff14;
+}
+.usuario-toggle-admin.is-admin:hover {
+  background: rgba(239,68,68,0.1);
+  border-color: #ef4444;
+  color: #ef4444;
+}
 
 .popup-edit {
   flex: 1;
