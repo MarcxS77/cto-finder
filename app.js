@@ -126,12 +126,20 @@ async function handleSession(session) {
     currentUser = session.user
 
     // Verifica admin no banco — não no frontend
-    const { data: profile } = await sb
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', currentUser.id)
-      .single()
-    isAdmin = !!profile?.is_admin
+    try {
+      const { data: profile, error: profileErr } = await sb
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', currentUser.id)
+        .single()
+      if (profileErr && profileErr.code !== 'PGRST116') {
+        console.warn('Profiles query error:', profileErr.message)
+      }
+      isAdmin = !!profile?.is_admin
+    } catch (e) {
+      console.warn('handleSession profiles error:', e)
+      isAdmin = false
+    }
 
     document.getElementById('loading-screen').style.display = 'none'
     document.getElementById('login-screen').style.display = 'none'
