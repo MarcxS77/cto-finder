@@ -843,6 +843,19 @@ body {
 .btn-aprovar-sm  { background: #166534; color: #4ade80; }
 .btn-rejeitar-sm { background: #7f1d1d; color: #f87171; }
 
+/* Popup pendente do próprio usuário */
+.popup-pendente-own-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #c2410c;
+  border: 1px solid #f97316;
+  padding: 5px 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
 /* Popup admin */
 .popup-pendente-tag {
   font-size: 11px;

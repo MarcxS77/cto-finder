@@ -629,6 +629,7 @@ async function loadCtos() {
   data.forEach((row) => {
     if (row.status_aprovacao === 'aprovado') addMarker(row)
     else if (isAdmin) addMarkerPendente(row)
+    else if (row.submetido_por === currentUser?.email) addMarkerPendenteOwn(row)
   })
   if (isAdmin) updatePendenteCount()
 
@@ -648,6 +649,8 @@ async function loadCtos() {
         addMarkerPendente(row)
         upsertPendenteItem(row)
         updatePendenteCount()
+      } else if (row.submetido_por === currentUser?.email) {
+        addMarkerPendenteOwn(row)
       }
     } else if (eventType === 'UPDATE') {
       removeMarker(row.id)
@@ -659,6 +662,8 @@ async function loadCtos() {
         addMarker(row)
       } else if (isAdmin && row.status_aprovacao === 'pendente') {
         addMarkerPendente(row)
+      } else if (row.submetido_por === currentUser?.email && row.status_aprovacao === 'pendente') {
+        addMarkerPendenteOwn(row)
       }
       updatePendenteCount()
     } else if (eventType === 'DELETE') {
@@ -917,6 +922,53 @@ function addMarkerPendente(row) {
   clusterGroup.addLayer(m)
   upsertPendenteItem(row)
   if (isAdmin) { upsertTodasItem(row); upsertAtividadeItem(row) }
+}
+
+// Marker laranja visível apenas para o próprio usuário que cadastrou
+function makeIconPendenteOwn(row) {
+  const { area, sp } = markerLabel(row)
+  const html = `
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div style="position:relative;color:#f97316;font-size:34px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.8))">
+        <i class="ph-fill ph-battery-vertical-full"></i>
+        <div style="position:absolute;top:-4px;right:-6px;font-size:11px;line-height:1">⏳</div>
+      </div>
+      <div style="background:#060f07;border:1.5px solid #f97316;border-radius:4px;padding:2px 6px;margin-top:1px;text-align:center;white-space:nowrap;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.6)">
+        <div style="font-size:10px;font-weight:800;color:#fff;font-family:'Courier New',monospace">${escHtml(area)}</div>
+        ${sp ? `<div style="font-size:9px;font-weight:600;color:#f97316;font-family:'Courier New',monospace">${escHtml(sp)}</div>` : ''}
+      </div>
+    </div>`
+  return L.divIcon({ html, className: '', iconSize: [72, 62], iconAnchor: [36, 62], popupAnchor: [0, -62] })
+}
+
+function buildPopupPendenteOwnHTML(row) {
+  const endFull = [row.endereco, row.numero].filter(Boolean).join(', ')
+  const enderecoHtml = (endFull || row.bairro)
+    ? `<div class="popup-meta"><span class="popup-tag">📍</span> ${escHtml([endFull, row.bairro].filter(Boolean).join(' — '))}</div>` : ''
+  const areaCaboHtml = row.area_cabo ? `<div class="popup-meta"><span class="popup-tag">ÁREA</span> ${escHtml(row.area_cabo)}</div>` : ''
+  const spHtml  = row.sp  ? `<div class="popup-meta"><span class="popup-tag">SP</span> ${escHtml(row.sp)}</div>` : ''
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${row.lat},${row.lng}`
+  return `
+    <div class="popup">
+      <div class="popup-pendente-own-tag">⏳ Aguardando aprovação do administrador</div>
+      <div class="popup-nome">${escHtml(row.area_cabo || 'CTO')}</div>
+      ${enderecoHtml}${areaCaboHtml}${spHtml}
+      <div class="popup-meta" style="color:#94a3b8;font-size:11px;margin-top:4px">
+        Esta caixa foi cadastrada por você e ficará visível para todos após aprovação.
+      </div>
+      <a class="popup-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Abrir rota no Google Maps
+      </a>
+    </div>`
+}
+
+function addMarkerPendenteOwn(row) {
+  ctoData[row.id] = row
+  const m = L.marker([row.lat, row.lng], { icon: makeIconPendenteOwn(row) }).bindPopup(buildPopupPendenteOwnHTML(row))
+  m._ctoId = row.id
+  markers[row.id] = m
+  clusterGroup.addLayer(m)
 }
 
 function removeMarker(id) {
