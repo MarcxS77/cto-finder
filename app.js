@@ -5,6 +5,7 @@ import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { queueCto, getPendingCtos, removePendingCto, getPendingCount } from './src/offline-queue.js'
+import { scanCtoLabel } from './src/ocr.js'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_KEY
@@ -1296,7 +1297,117 @@ window.focusMarker = (id) => {
   }
 }
 
+// ── Scan de etiqueta por foto ─────────────────────────────────
+window.scanFoto = function () {
+  document.getElementById('input-scan-foto').click()
+}
+
+document.getElementById('input-scan-foto').addEventListener('change', async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+
+  const status = document.getElementById('scan-status')
+  const btn    = document.getElementById('btn-scan-foto')
+  status.style.display = 'flex'
+  status.className     = 'scan-status loading'
+  status.textContent   = '📷 Analisando foto…'
+  btn.disabled         = true
+
+  try {
+    // Reduz a imagem para economizar tokens (máx 1024px)
+    const base64 = await resizeAndEncode(file, 1024)
+    const mediaType = file.type || 'image/jpeg'
+
+    const res  = await fetch('/api/scan-cto', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({ image: base64, mediaType }),
+    })
+    const data = await res.json()
+
+    if (data.error) throw new Error(data.error)
+
+    let preenchidos = 0
+    if (data.area_cabo) { document.getElementById('f-area-cabo').value = data.area_cabo; preenchidos++ }
+    if (data.sp)        { document.getElementById('f-sp').value        = data.sp;        preenchidos++ }
+    if (data.sec)       { document.getElementById('f-sec').value       = data.sec;       preenchidos++ }
+
+    if (preenchidos === 0) {
+      status.className   = 'scan-status warn'
+      status.textContent = '⚠️ Nenhum campo identificado — tente uma foto mais próxima da etiqueta'
+    } else {
+      status.className   = 'scan-status ok'
+      status.textContent = `✅ ${preenchidos} campo${preenchidos > 1 ? 's' : ''} preenchido${preenchidos > 1 ? 's' : ''} automaticamente`
+      setTimeout(() => { status.style.display = 'none' }, 4000)
+    }
+  } catch (err) {
+    status.className   = 'scan-status error'
+    status.textContent = '❌ Erro ao analisar: ' + err.message
+  } finally {
+    btn.disabled = false
+    e.target.value = ''
+  }
+})
+
+function resizeAndEncode(file, maxPx) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale  = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width  = Math.round(img.width  * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      const base64 = canvas.toDataURL('image/jpeg', 0.88).split(',')[1]
+      resolve(base64)
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
 // ── Modal ─────────────────────────────────────────────────────
+// ── OCR — scan da etiqueta da CTO ─────────────────────────────
+function initOcrButton() {
+  const btn   = document.getElementById('btn-scan-foto')
+  const input = document.getElementById('input-scan-foto')
+  if (!btn || !input || btn._ocrInit) return
+  btn._ocrInit = true
+
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    btn.disabled    = true
+    btn.innerHTML   = '<i class="ph ph-spinner"></i> Lendo etiqueta…'
+    setGeocodeMsg('Processando imagem, aguarde…', '')
+
+    try {
+      const dados = await scanCtoLabel(file, (msg) => setGeocodeMsg(msg, ''))
+
+      const preenchido = []
+      if (dados.area_cabo) { document.getElementById('f-area-cabo').value = dados.area_cabo; preenchido.push('Área: ' + dados.area_cabo) }
+      if (dados.sp)        { document.getElementById('f-sp').value        = dados.sp;        preenchido.push('SP: '   + dados.sp) }
+      if (dados.sec)       { document.getElementById('f-sec').value       = dados.sec;       preenchido.push('SEC: '  + dados.sec) }
+
+      if (preenchido.length) {
+        setGeocodeMsg('✓ ' + preenchido.join(' · '), 'success')
+      } else {
+        setGeocodeMsg('⚠️ Não reconheceu os dados — preencha manualmente.', 'error')
+      }
+    } catch (err) {
+      setGeocodeMsg('Erro ao processar imagem.', 'error')
+      console.error(err)
+    } finally {
+      btn.disabled  = false
+      btn.innerHTML = '<i class="ph ph-camera"></i> Escanear etiqueta com câmera'
+      input.value   = ''
+    }
+  }
+}
+
 window.toggleFttaFields = function(checked) {
   const el = document.getElementById('ftta-fields')
   if (el) el.style.display = checked ? 'block' : 'none'
@@ -1323,6 +1434,7 @@ function openModal() {
   if (fttaFields) fttaFields.style.display = 'none'
   setGeocodeMsg('', '')
   document.getElementById('modal').style.display = 'flex'
+  initOcrButton()
   document.getElementById('f-endereco').focus()
 }
 
