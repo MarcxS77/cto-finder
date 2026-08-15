@@ -5,7 +5,7 @@ import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { queueCto, getPendingCtos, removePendingCto, getPendingCount } from './src/offline-queue.js'
-import { scanCtoLabel } from './src/ocr.js'
+import { scanCtoLabel, disposeWorker } from './src/ocr.js'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_KEY
@@ -1313,13 +1313,29 @@ function initOcrButton() {
     const file = e.target.files[0]
     if (!file) return
 
-    btn.disabled    = true
-    btn.innerHTML   = '<i class="ph ph-spinner"></i> Lendo etiqueta…'
-    setGeocodeMsg('Processando imagem, aguarde…', '')
+    btn.disabled  = true
+    setGeocodeMsg('Iniciando OCR…', '')
+
+    const updateBtn = (msg) => {
+      btn.innerHTML = `<i class="ph ph-spinner"></i> ${msg}`
+      setGeocodeMsg(msg, '')
+    }
+
+    // Timeout de 40s para não travar indefinidamente
+    let timedOut = false
+    const timeout = setTimeout(() => {
+      timedOut = true
+      btn.disabled  = false
+      btn.innerHTML = '<i class="ph ph-camera"></i> Escanear etiqueta com câmera'
+      setGeocodeMsg('⚠️ Tempo limite atingido — tente com foto mais nítida.', 'error')
+      input.value = ''
+    }, 40000)
 
     try {
-      const dados = await scanCtoLabel(file, (msg) => setGeocodeMsg(msg, ''))
+      const dados = await scanCtoLabel(file, updateBtn)
+      if (timedOut) return
 
+      clearTimeout(timeout)
       const preenchido = []
       if (dados.area_cabo) { document.getElementById('f-area-cabo').value = dados.area_cabo; preenchido.push('Área: ' + dados.area_cabo) }
       if (dados.sp)        { document.getElementById('f-sp').value        = dados.sp;        preenchido.push('SP: '   + dados.sp) }
@@ -1331,12 +1347,15 @@ function initOcrButton() {
         setGeocodeMsg('⚠️ Não reconheceu os dados — preencha manualmente.', 'error')
       }
     } catch (err) {
-      setGeocodeMsg('Erro ao processar imagem.', 'error')
-      console.error(err)
+      clearTimeout(timeout)
+      if (!timedOut) setGeocodeMsg('Erro ao processar imagem: ' + err.message, 'error')
+      console.error('[OCR]', err)
     } finally {
-      btn.disabled  = false
-      btn.innerHTML = '<i class="ph ph-camera"></i> Escanear etiqueta com câmera'
-      input.value   = ''
+      if (!timedOut) {
+        btn.disabled  = false
+        btn.innerHTML = '<i class="ph ph-camera"></i> Escanear etiqueta com câmera'
+        input.value   = ''
+      }
     }
   }
 }

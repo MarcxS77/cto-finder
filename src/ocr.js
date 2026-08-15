@@ -1,27 +1,52 @@
 import { createWorker } from 'tesseract.js'
 
 let worker = null
+let workerReady = false
 
-async function getWorker() {
-  if (worker) return worker
-  worker = await createWorker('por+eng', 1, {
+async function getWorker(onProgress) {
+  if (worker && workerReady) return worker
+
+  // Destrói worker corrompido se existir
+  if (worker && !workerReady) {
+    try { await worker.terminate() } catch (_) {}
+    worker = null
+  }
+
+  onProgress?.('Baixando OCR (1ª vez ~3MB)…')
+
+  worker = await createWorker('eng', 1, {
     workerPath: 'https://unpkg.com/tesseract.js@5/dist/worker.min.js',
-    langPath:   'https://tessdata.projectnaptha.com/4.0.0',
+    langPath:   'https://tessdata.projectnaptha.com/4.0.0_fast',
     corePath:   'https://unpkg.com/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js',
-    logger:     () => {},
+    logger: (m) => {
+      if (m.status === 'loading tesseract core') onProgress?.('Carregando motor OCR…')
+      if (m.status === 'initializing tesseract') onProgress?.('Inicializando…')
+      if (m.status === 'loading language traineddata') {
+        const pct = m.progress ? Math.round(m.progress * 100) : 0
+        onProgress?.(`Baixando dados de idioma… ${pct}%`)
+      }
+      if (m.status === 'recognizing text') {
+        const pct = m.progress ? Math.round(m.progress * 100) : 0
+        onProgress?.(`Lendo etiqueta… ${pct}%`)
+      }
+    },
   })
+
   await worker.setParameters({
-    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:.- ',
+    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:.- ',
+    tessedit_pageseg_mode:   '6', // assume bloco uniforme de texto
   })
+
+  workerReady = true
   return worker
 }
 
 // Extrai informações de uma CTO a partir de texto OCR
 function parseCtoText(text) {
-  const t   = text.toUpperCase().replace(/\n/g, ' ').replace(/\s+/g, ' ')
+  const t = text.toUpperCase().replace(/\n/g, ' ').replace(/\s+/g, ' ')
   const result = {}
 
-  // Area/Cabo: sequência de 2-5 letras seguidas de 2-3 números (ex: IPFH01, JDPA02, CTO01)
+  // Área/Cabo: 2-5 letras seguidas de 2-3 dígitos (ex: IPFH01, JDPA02, CTO01)
   const areaMatch = t.match(/\b([A-Z]{2,5}\d{2,3})\b/)
   if (areaMatch) result.area_cabo = areaMatch[1]
 
@@ -37,7 +62,7 @@ function parseCtoText(text) {
 }
 
 export async function scanCtoLabel(imageFile, onProgress) {
-  const w = await getWorker()
+  const w = await getWorker(onProgress)
 
   onProgress?.('Analisando imagem…')
   const { data } = await w.recognize(imageFile)
@@ -45,6 +70,14 @@ export async function scanCtoLabel(imageFile, onProgress) {
   onProgress?.('Extraindo dados…')
   const parsed = parseCtoText(data.text)
   parsed._rawText = data.text
-
   return parsed
+}
+
+// Libera memória quando não em uso (chamado ao fechar o modal)
+export async function disposeWorker() {
+  if (worker) {
+    try { await worker.terminate() } catch (_) {}
+    worker = null
+    workerReady = false
+  }
 }
