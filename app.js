@@ -1153,7 +1153,7 @@ document.getElementById('form-cto').onsubmit = async (e) => {
     status:           document.getElementById('f-status').value,
     lat:              pendingLatLng.lat,
     lng:              pendingLatLng.lng,
-    status_aprovacao: (isAdmin || fttaAutoApprove) ? 'aprovado' : 'pendente',
+    status_aprovacao: 'aprovado',
     submetido_por:    currentUser?.email || '',
     ftta:             ftta,
     andar:            ftta ? (document.getElementById('f-andar')?.value.trim() || null) : null,
@@ -1183,14 +1183,14 @@ document.getElementById('form-cto').onsubmit = async (e) => {
   } else {
     if (inserted) window._applyChange('INSERT', inserted)
     closeModal()
-    if (!isAdmin) {
-      const hint = document.getElementById('hint')
-      hint.textContent = '✅ CTO enviada para análise — aguarde aprovação do administrador'
+    const hint = document.getElementById('hint')
+    if (hint) {
+      hint.textContent = '✅ CTO cadastrada com sucesso!'
       hint.style.color = '#4ade80'
       setTimeout(() => {
         hint.textContent = 'Toque no mapa ou use 📍 para registrar uma CTO'
         hint.style.color = ''
-      }, 5000)
+      }, 4000)
     }
   }
 }
